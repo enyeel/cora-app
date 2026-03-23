@@ -1,0 +1,17 @@
+# --- Frontend ---
+streamlit
+
+# --- Manejo y Limpieza de Datos ---
+pandas
+numpy
+openpyxl
+
+# --- Estadística y Machine Learning ---
+scipy
+scikit-learn
+factor_analyzer
+
+# --- Gráficos ---
+plotly
+seaborn
+matplotlib
