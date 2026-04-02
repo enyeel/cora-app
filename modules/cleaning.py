@@ -31,16 +31,44 @@ def detectar_outliers(df):
     return mapa_outliers, cols_afectadas
 
 def detectar_webones(df, umbral_varianza=0.0):
-    """Busca filas con varianza nula en sus respuestas. Devuelve un mapa de las filas afectadas."""
-    cols_num = df.select_dtypes(include=[np.number]).columns
+    """
+    Busca webones agrupando inteligentemente las columnas que comparten 
+    el mismo Mínimo y Máximo (Ej. escalas del 1 al 5).
+    """
+    # 1. Filtramos las numéricas y quitamos el ID
+    cols_num = [col for col in df.select_dtypes(include=[np.number]).columns if col != 'ID_Usuario']
     
-    # Si hay suficientes columnas numéricas para comparar
-    if len(cols_num) > 1:
-        varianza_filas = df[cols_num].var(axis=1)
-        # Devuelve una serie de True/False por cada fila
-        filas_webones = varianza_filas <= umbral_varianza 
-    else:
-        filas_webones = pd.Series(False, index=df.index)
+    grupos_likert = {}
+    
+    # 2. Agrupamos por Min y Max (ignorando los nulos)
+    for col in cols_num:
+        # Si la columna está totalmente vacía, la ignoramos
+        if df[col].dropna().empty:
+            continue
+            
+        # Sacamos min y max ignorando los NaNs, y forzamos a entero para evitar el "1.0"
+        minimo = int(df[col].min(skipna=True))
+        maximo = int(df[col].max(skipna=True))
+        
+        etiqueta_rango = f"Rango_{minimo}_a_{maximo}"
+        
+        if etiqueta_rango not in grupos_likert:
+            grupos_likert[etiqueta_rango] = []
+        grupos_likert[etiqueta_rango].append(col)
+
+    # 3. Filtramos los grupos que tengan 3 o más preguntas
+    grupos_encuesta = {rango: columnas for rango, columnas in grupos_likert.items() if len(columnas) >= 3}
+    
+    # Preparamos una lista de falsos (nadie es webón hasta que se demuestre lo contrario)
+    filas_webones = pd.Series(False, index=df.index)
+    
+    # 4. Calculamos la varianza SOLO en los grupos detectados (Ej. Pregunta 1 a 5)
+    for rango, columnas in grupos_encuesta.items():
+        # Varianza horizontal (axis=1)
+        varianza = df[columnas].var(axis=1)
+        
+        # Marcamos como True a los que tengan varianza nula
+        filas_webones = filas_webones | (varianza <= umbral_varianza)
         
     return filas_webones
 
@@ -61,22 +89,6 @@ def codificar_categoricos(df):
 # ==========================================
 # FUNCION 2: OUTLIERS (Método IQR)
 # ==========================================
-def limpiar_outliers_iqr(df, columnas_a_revisar):
-    """Detecta valores atípicos con IQR y los convierte en NaN para su posterior imputación."""
-    df_temp = df.copy()
-
-    for col in columnas_a_revisar:
-        if col in df_temp.columns:
-            Q1 = df_temp[col].quantile(0.25)
-            Q3 = df_temp[col].quantile(0.75)
-            IQR = Q3 - Q1
-            Lim_inf = Q1 - 1.5 * IQR
-            Lim_sup = Q3 + 1.5 * IQR
-
-            # Convertimos a NaN los que se salen del corral
-            df_temp.loc[(df_temp[col] < Lim_inf) | (df_temp[col] > Lim_sup), col] = np.nan
-
-    return df_temp
 
 # ==========================================
 # FUNCION 3: FILTRO STRAIGHT-LINING (Webones)
