@@ -4,7 +4,7 @@ import numpy as np
 
 # IMPORTAMOS NUESTRAS ARMAS
 from modules.cleaning import detectar_outliers, detectar_webones
-from modules.cleaning_motor import ejecutar_pipeline_maestro
+from modules.cleaning_motor import aplicar_outliers, aplicar_webones, aplicar_nulos
 
 # =======================================================
 # 🖥️ LA INTERFAZ DE USUARIO (UI) - BRANDING DIA
@@ -22,21 +22,11 @@ st.title("CEXO Analysis")
 st.markdown("*Powered by **DIA** - Algoritmos de vanguardia para datos impecables.*")
 st.divider()
 
-# ==========================================
-# ⚙️ INICIALIZACIÓN DE LA MEMORIA CENTRAL
-# ==========================================
-pipeline_config = {
-    "outliers": {"enabled": True, "acciones_por_fila": {}},
-    "webones": {"enabled": True, "acciones_por_fila": {}}, # <-- ESTO CAMBIÓ
-    "imputacion": {"enabled": False, "metodo_num": "Media", "forzar_drop": False}
-}
-
 st.title("Limpieza de Datos")
 
 archivo_subido = st.file_uploader("Sube tu dataset sucio (CSV o Excel)", type=["csv", "xlsx"])
 
 if archivo_subido is not None:
-    # Leemos el archivo una sola vez (evita consumir el buffer varias veces)
     try:
         if archivo_subido.name.endswith('.csv'):
             df_raw = pd.read_csv(archivo_subido)
@@ -46,37 +36,33 @@ if archivo_subido is not None:
         st.error("🚨 Archivo dañado o ilegible.")
         st.stop()
 
-    # Si es un archivo nuevo (nombre distinto) actualizamos la memoria y
-    # reiniciamos el historial quirúrgico y los detectores pesados.
+    # 🧠 TRUCO 1: Guardamos la memoria config en el session_state para curar la amnesia
     if 'nombre_archivo' not in st.session_state or st.session_state['nombre_archivo'] != archivo_subido.name:
         st.session_state['df_original'] = df_raw.copy()
         st.session_state['nombre_archivo'] = archivo_subido.name
-        if 'config_quirurgica' in st.session_state:
-            del st.session_state['config_quirurgica']
+        
+        # Reiniciamos la memoria de decisiones al subir nuevo archivo
+        st.session_state['pipeline_config'] = {
+            "outliers": {"enabled": True, "acciones_por_fila": {}},
+            "webones": {"enabled": True, "acciones_por_fila": {}},
+            "imputacion": {"enabled": True, "estrategia_global": "Media", "acciones_por_columna": {}}
+        }
 
-        # Recalculamos los detectores para el nuevo archivo
+        # Recalculamos los detectores
         mapa_out, cols_out = detectar_outliers(df_raw)
         st.session_state['mapa_outliers'] = mapa_out
         st.session_state['cols_con_outliers'] = cols_out
         st.session_state['filas_webones'] = detectar_webones(df_raw)
-    else:
-        # Si por alguna razón faltan variables en sesión, las calculamos/aseguramos
-        if 'df_original' not in st.session_state:
-            st.session_state['df_original'] = df_raw.copy()
-        if 'mapa_outliers' not in st.session_state or 'filas_webones' not in st.session_state:
-            mapa_out, cols_out = detectar_outliers(st.session_state['df_original'])
-            st.session_state['mapa_outliers'] = mapa_out
-            st.session_state['cols_con_outliers'] = cols_out
-            st.session_state['filas_webones'] = detectar_webones(st.session_state['df_original'])
 
-    # Recuperamos las variables de la memoria
-    df = st.session_state['df_original']
+    # Recuperamos las variables
+    df_original = st.session_state['df_original']
     mapa_outliers = st.session_state['mapa_outliers']
     filas_webones = st.session_state['filas_webones']
+    pipeline_config = st.session_state['pipeline_config'] # 🧠 Referencia directa a la memoria viva
 
-    # Métricas
-    total_filas = len(df)
-    total_nulos = df.isna().sum().sum()
+    # Métricas Base
+    total_filas = len(df_original)
+    total_nulos = df_original.isna().sum().sum()
     total_outliers = mapa_outliers.sum().sum()
     total_webones = filas_webones.sum()
 
@@ -98,12 +84,12 @@ if archivo_subido is not None:
         return estilos
 
     formatos_columnas = {
-        col: "{:.0f}" if not df[col].dropna().empty and all(x.is_integer() for x in df[col].dropna()) else "{}"
-        for col in df.select_dtypes(include=[np.number]).columns
+        col: "{:.0f}" if not df_original[col].dropna().empty and all(x.is_integer() for x in df_original[col].dropna()) else "{}"
+        for col in df_original.select_dtypes(include=[np.number]).columns
     }
 
     st.dataframe(
-        df.style.apply(pintar_rayos_x, axis=None).format(formatter=formatos_columnas, na_rep="NaN"), 
+        df_original.style.apply(pintar_rayos_x, axis=None).format(formatter=formatos_columnas, na_rep="NaN"), 
         height=350, use_container_width=True
     )
     
@@ -112,19 +98,19 @@ if archivo_subido is not None:
     col2.metric("Nulos Encontrados", total_nulos)
     col3.metric("Outliers Detectados", total_outliers)
     col4.metric("Usuarios Inválidos", total_webones)
-    
+
     st.divider()
 
     # ==========================================
-    # 🎯 SECCIÓN 2: TRATAMIENTO QUIRÚRGICO
+    # 🎯 SECCIÓN 2: TRATAMIENTO QUIRÚRGICO (OUTLIERS)
     # ==========================================
-    tratar_activado = st.toggle("Habilitar Tratamiento de Outliers", value=True)
+    tratar_activado = st.toggle("Habilitar Tratamiento de Outliers", value=pipeline_config["outliers"]["enabled"])
     pipeline_config["outliers"]["enabled"] = tratar_activado
 
     if tratar_activado:
         st.markdown("### 2. Tratamiento Quirúrgico de Outliers")
         filas_con_outliers = mapa_outliers.any(axis=1)
-        df_contexto_outliers = df.loc[filas_con_outliers].copy()
+        df_contexto_outliers = df_original.loc[filas_con_outliers].copy()
 
         if not df_contexto_outliers.empty:
             df_contexto_outliers = df_contexto_outliers.reset_index()
@@ -145,7 +131,6 @@ if archivo_subido is not None:
 
             cols_intocables = [col for col in df_contexto_outliers.columns if col != '¿Qué hacemos?']
 
-            # 🔥 AL CAMBIAR ALGO AQUÍ, STREAMLIT RECARGA Y ACTUALIZA EL RESULTADO FINAL ABAJO
             df_editado = st.data_editor(
                 df_contexto_outliers.style.apply(pintar_editor, axis=None).format(formatter=formatos_columnas, na_rep="NaN"),
                 column_config={
@@ -158,71 +143,215 @@ if archivo_subido is not None:
                 },
                 disabled=cols_intocables,
                 hide_index=True,
-                use_container_width=True
+                use_container_width=True,
+                key="editor_outliers"
             )
 
-            # 🛠️ LLENAMOS EL DICCIONARIO REACTIVO EN TIEMPO REAL
+            # Llenamos memoria
+            pipeline_config["outliers"]["acciones_por_fila"].clear()
             for _, row in df_editado.iterrows():
                 orig_idx = row.get('_orig_index')
                 accion = row.get('¿Qué hacemos?')
                 if accion != "Ignorar (Dejar como está)":
                     pipeline_config["outliers"]["acciones_por_fila"][orig_idx] = accion
-
         else:
             st.success("¡Base de datos impecable! No se detectaron outliers.")
     else:
         st.markdown("### ~~2. Tratamiento Quirúrgico de Outliers~~")
-        st.info("⚠️ El tratamiento de outliers está desactivado. Los valores atípicos pasarán intactos.")
+        st.info("⚠️ El tratamiento de outliers está desactivado.")
+
+    # 🧠 TRUCO 2: Aplicar HASTA EL FINAL de la sección, ya que recolectamos las decisiones
+    df_sin_outliers = aplicar_outliers(df_original, mapa_outliers, pipeline_config)
 
     st.divider()
 
     # ==========================================
-    # 🎯 SECCIONES 3 Y 4 (Las conectaremos después)
+    # 🎯 SECCIÓN 3: FILTRO DE VARIANZA NULA (WEBONES)
     # ==========================================
-    # st.header("3. Filtro de Varianza Nula (Straight-lining)") ...
-    # st.header("4. Imputación de Nulos") ...
+    tratar_webones = st.toggle("Habilitar Filtro de Usuarios Inválidos (Straight-lining)", value=pipeline_config["webones"]["enabled"])
+    pipeline_config["webones"]["enabled"] = tratar_webones
+
+    if tratar_webones:
+        st.markdown("### 3. Filtro de Varianza Nula (Straight-lining)")
+        
+        # Filtramos sobre df_sin_outliers
+        df_contexto_webones = df_sin_outliers.loc[filas_webones[filas_webones].index.intersection(df_sin_outliers.index)].copy()
+        
+        if not df_contexto_webones.empty:
+            st.markdown("👀 **Vista de Inspección:** Usuarios que respondieron lo mismo en toda la encuesta.")
+            df_contexto_webones = df_contexto_webones.reset_index()
+            df_contexto_webones.rename(columns={'index': '_orig_index'}, inplace=True)
+            df_contexto_webones.insert(0, '¿Qué hacemos?', 'Eliminar fila completa') 
+            
+            def pintar_editor_webones(data):
+                estilos = pd.DataFrame('', index=data.index, columns=data.columns)
+                estilos.loc[:, :] = 'background-color: rgba(150, 75, 255, 0.3);'
+                return estilos
+            
+            cols_intocables_w = [col for col in df_contexto_webones.columns if col != '¿Qué hacemos?']
+            
+            df_editado_w = st.data_editor(
+                df_contexto_webones.style.apply(pintar_editor_webones, axis=None).format(formatter=formatos_columnas, na_rep="NaN"),
+                column_config={
+                    "¿Qué hacemos?": st.column_config.SelectboxColumn(
+                        "Seleccionar Acción",
+                        options=["Eliminar fila completa", "Ignorar (Dejar como está)"],
+                        required=True,
+                    ),
+                    "_orig_index": None,
+                },
+                disabled=cols_intocables_w,
+                hide_index=True,
+                use_container_width=True,
+                key="editor_webones" 
+            )
+            
+            pipeline_config["webones"]["acciones_por_fila"].clear()
+            for _, row in df_editado_w.iterrows():
+                orig_idx = row.get('_orig_index')
+                accion = row.get('¿Qué hacemos?')
+                if accion != "Ignorar (Dejar como está)":
+                    pipeline_config["webones"]["acciones_por_fila"][orig_idx] = accion
+        else:
+            st.success("¡Excelente! No se detectaron usuarios con varianza nula (o ya fueron eliminados).")
+    else:
+        st.markdown("### ~~3. Filtro de Varianza Nula~~")
+        st.info("⚠️ Filtro desactivado.")
+
+    # 🧠 Aplicamos HASTA EL FINAL de la sección 3
+    df_sin_webones = aplicar_webones(df_sin_outliers, pipeline_config)
+
+    st.divider()
+
+    # ==========================================
+    # 🎯 SECCIÓN 4: TRATAMIENTO DE NULOS
+    # ==========================================
+    tratar_nulos = st.toggle("Habilitar Tratamiento de Valores Nulos", value=pipeline_config["imputacion"]["enabled"])
+    pipeline_config["imputacion"]["enabled"] = tratar_nulos
+
+    if tratar_nulos:
+        st.markdown("### 4. Tratamiento de Valores Nulos")
+        
+        col_glob1, col_glob2 = st.columns([1, 2])
+        estrategia_global = col_glob1.radio(
+            "Estrategia Global por defecto para variables numéricas:", 
+            options=["Media", "Mediana"], 
+            horizontal=True,
+            index=0 if pipeline_config["imputacion"]["estrategia_global"] == "Media" else 1
+        )
+        pipeline_config["imputacion"]["estrategia_global"] = estrategia_global
+        
+        # Leemos los nulos del DF que ya viene curado de la Sección 3
+        filas_con_nulos = df_sin_webones[df_sin_webones.isnull().any(axis=1)]
+        
+        if not filas_con_nulos.empty:
+            st.markdown("👀 **Vista de Contexto:** Estas son las filas que contienen valores faltantes (originales o inyectados).")
+            
+            def pintar_celdas_nulas(val):
+                return 'background-color: rgba(255, 75, 75, 0.3)' if pd.isna(val) else ''
+            
+            metodo_map = getattr(filas_con_nulos.style, 'map', getattr(filas_con_nulos.style, 'applymap', None))
+            st.dataframe(
+                metodo_map(pintar_celdas_nulas).format(formatter=formatos_columnas, na_rep="NaN"),
+                height=250, use_container_width=True
+            )
+            
+            st.markdown("🛠️ **Acciones por Columna:**")
+            nulos_por_col = df_sin_webones.isnull().sum()
+            cols_con_nulos = nulos_por_col[nulos_por_col > 0].index.tolist()
+            
+            df_nulos_contexto = pd.DataFrame({
+                "Columna": cols_con_nulos,
+                "Tipo de Dato": [str(df_sin_webones[col].dtype) for col in cols_con_nulos],
+                "Nulos Iniciales": nulos_por_col[cols_con_nulos].values,
+                "Acción a tomar": ["Usar Estrategia Global"] * len(cols_con_nulos)
+            })
+            
+            def pintar_editor_nulos(data):
+                estilos = pd.DataFrame('', index=data.index, columns=data.columns)
+                estilos.loc[:, :] = 'background-color: rgba(255, 165, 0, 0.2);' 
+                return estilos
+            
+            df_editado_nulos = st.data_editor(
+                df_nulos_contexto.style.apply(pintar_editor_nulos, axis=None),
+                column_config={
+                    "Acción a tomar": st.column_config.SelectboxColumn(
+                        "Estrategia Específica",
+                        options=["Usar Estrategia Global", "Imputar por Media", "Imputar por Mediana", "Eliminar filas con nulos", "Ignorar (Dejar nulo)"],
+                        required=True,
+                    ),
+                    "Columna": st.column_config.Column(disabled=True),
+                    "Tipo de Dato": st.column_config.Column(disabled=True),
+                    "Nulos Iniciales": st.column_config.Column(disabled=True),
+                },
+                hide_index=True, use_container_width=True, key="editor_nulos"
+            )
+            
+            pipeline_config["imputacion"]["acciones_por_columna"].clear()
+            for _, row in df_editado_nulos.iterrows():
+                pipeline_config["imputacion"]["acciones_por_columna"][row['Columna']] = row['Acción a tomar']
+        else:
+            st.success("¡Excelente! En este punto del pipeline ya no existen valores nulos.")
+    else:
+        st.markdown("### ~~4. Tratamiento de Valores Nulos~~")
+        st.info("⚠️ Módulo desactivado.")
+
+    # 🧠 Aplicamos HASTA EL FINAL de la sección 4
+    df_imputado = aplicar_nulos(df_sin_webones, pipeline_config)
+
+    st.divider()
 
     # ==========================================
     # 🎯 SECCIÓN 5: RESULTADO FINAL (MAGIA EN VIVO)
     # ==========================================
     st.header("5. Resultado Final en Tiempo Real (Datos AI-Ready)")
+    df_final = df_imputado.copy() 
     
-    # 🚀 EL ORQUESTADOR ENTRA EN ACCIÓN
-    df_limpio_actual = ejecutar_pipeline_maestro(
-        st.session_state['df_original'], 
-        mapa_outliers, 
-        pipeline_config
-    )
+    st.markdown("CEXO ha procesado tus decisiones en vivo. Así se ve tu dataset en este momento:")
     
-    st.markdown("CEXO está procesando tus decisiones en vivo. Así se ve tu dataset en este momento:")
+    filas_finales = len(df_final)
+    nulos_finales = df_final.isna().sum().sum()
     
-    # --- 🧮 CÁLCULO DE MÉTRICAS ACTUALIZADAS ---
-    filas_finales = len(df_limpio_actual)
-    nulos_finales = df_limpio_actual.isna().sum().sum()
-    
-    # Outliers restantes: contamos los que eran True en el mapa original 
-    # y que la celda actual SIGUE existiendo y NO es nula.
-    filas_sobrevivientes = df_limpio_actual.index.intersection(mapa_outliers.index)
+    filas_sobrevivientes = df_final.index.intersection(mapa_outliers.index)
     outliers_restantes = 0
     for col in mapa_outliers.columns:
-        if col in df_limpio_actual.columns:
-            # Sumamos las celdas que eran outlier Y que en el df limpio no son nulas
-            outliers_restantes += (mapa_outliers.loc[filas_sobrevivientes, col] & df_limpio_actual.loc[filas_sobrevivientes, col].notna()).sum()
+        if col in df_final.columns:
+            # Si era outlier, sobrevivió a la purga, y su valor YA NO ES NULO y CAMBIÓ del original (fue imputado), ya no es outlier.
+            # Solo contamos como outlier si sigue siendo exactamente igual al original.
+            es_outlier_original = mapa_outliers.loc[filas_sobrevivientes, col]
+            sigue_igual = df_final.loc[filas_sobrevivientes, col] == df_original.loc[filas_sobrevivientes, col]
+            outliers_restantes += (es_outlier_original & sigue_igual).sum()
             
-    # Webones restantes: los que sobrevivieron al drop
     webones_restantes = filas_webones.loc[filas_sobrevivientes].sum()
 
-    # --- 🃏 PINTAMOS LAS TARJETITAS CON DELTAS ---
     col_r1, col_r2, col_r3, col_r4 = st.columns(4)
-    # Delta inverso para que si bajan los nulos/outliers se ponga verde
     col_r1.metric("Filas Finales", filas_finales, delta=int(filas_finales - total_filas))
     col_r2.metric("Nulos Actuales", nulos_finales, delta=int(nulos_finales - total_nulos), delta_color="inverse")
     col_r3.metric("Outliers Restantes", outliers_restantes, delta=int(outliers_restantes - total_outliers), delta_color="inverse")
     col_r4.metric("Inválidos Restantes", int(webones_restantes), delta=int(webones_restantes - total_webones), delta_color="inverse")
 
-    # --- 🎨 PINTAMOS LA TABLA FINAL ---
+    # 🎨 PINTAMOS LA TABLA FINAL (Sólo lo que sigue sucio)
+    def pintar_final(data):
+        estilos = pd.DataFrame('', index=data.index, columns=data.columns)
+        webones_alineados = filas_webones.loc[data.index]
+        
+        for idx in data.index[webones_alineados]:
+            estilos.loc[idx, :] = 'background-color: rgba(150, 75, 255, 0.3);'
+            
+        for col in data.columns:
+            if col in mapa_outliers.columns:
+                es_outlier_original = mapa_outliers.loc[data.index, col]
+                sigue_igual = data[col] == df_original.loc[data.index, col]
+                estilos.loc[es_outlier_original & sigue_igual, col] = 'background-color: rgba(75, 150, 255, 0.5); font-weight: bold;'
+                
+        estilos[data.isna()] = 'background-color: rgba(255, 75, 75, 0.6);'
+        return estilos
+
     st.dataframe(
-        df_limpio_actual.style.apply(pintar_rayos_x, axis=None).format(formatter=formatos_columnas, na_rep="NaN"), 
+        df_final.style.apply(pintar_final, axis=None).format(formatter=formatos_columnas, na_rep="NaN"), 
         height=300, 
         use_container_width=True
     )
+
+    if nulos_finales > 0:
+        st.warning(f"⚠️ **Aviso:** Tu dataset final aún tiene **{nulos_finales}** valores nulos. Asegúrate de que los módulos posteriores de análisis soporten datos faltantes.")
