@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from pandas.api.types import is_numeric_dtype
-from modules.cleaning import detectar_outliers, detectar_webones
+from modules.cleaning import detectar_outliers, detectar_webones, codificar_categoricos_inteligente
 from modules.cleaning_motor import aplicar_estructural, aplicar_outliers, aplicar_webones, aplicar_nulos
+from modules.dataset_profiler import analizar_dataframe
 
 def renderizar_df_paginado(
     df,
@@ -95,6 +96,7 @@ if archivo_subido is not None:
             df_raw = pd.read_csv(archivo_subido)
         else:
             df_raw = pd.read_excel(archivo_subido)
+            
     except Exception:
         st.error("🚨 Archivo dañado o ilegible.")
         st.stop()
@@ -123,11 +125,16 @@ if archivo_subido is not None:
         def detectar_webones_cache(df):
             return detectar_webones(df)
 
+        @st.cache_data
+        def analizar_dataframe_cache(df):
+            return analizar_dataframe(df)
+
         # Recalculamos los detectores
         mapa_out, cols_out = detectar_outliers_cache(df_raw)
         st.session_state['mapa_outliers'] = mapa_out
         st.session_state['cols_con_outliers'] = cols_out
         st.session_state['filas_webones'] = detectar_webones_cache(df_raw)
+        st.session_state['metadata'] = analizar_dataframe_cache(df_raw)
 
 # RENDERIZAR LA INTERFAZ (Solo si hay datos en memoria)
 if 'df_original' in st.session_state:
@@ -193,6 +200,12 @@ if 'df_original' in st.session_state:
 
     st.divider()
 
+    st.subheader("🧠 Perfil automático del dataset")
+    st.dataframe(
+        pd.DataFrame(st.session_state.metadata).T
+    )
+
+    st.divider()
     # ==========================================
     # 👻 SECCIÓN 1.5: LIMPIEZA ESTRUCTURAL 
     # ==========================================
@@ -565,7 +578,10 @@ if 'df_original' in st.session_state:
             # pd.get_dummies convierte textos/categorías en columnas de 0s y 1s.
             # drop_first=True evita la multicolinealidad perfecta (ideal para modelos)
             # dtype=int asegura que salgan 1s y 0s en vez de True/False
-            df_encoded = pd.get_dummies(df_imputado, drop_first=True, dtype=int)
+            df_encoded = codificar_categoricos_inteligente(
+                df_imputado,
+                st.session_state['metadata']
+            )
             st.session_state['df_encoded'] = df_encoded.copy()
             
             # 3. Generar y guardar el clon SCALED (Estandarizado)

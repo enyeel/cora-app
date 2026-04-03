@@ -75,14 +75,22 @@ def detectar_webones(df, umbral_varianza=0.0):
 # ==========================================
 # FUNCION 1: ONE-HOT ENCODING (Textos a Números)
 # ==========================================
-def codificar_categoricos(df):
-    """Detecta columnas de texto y aplica One-Hot Encoding."""
-    df_temp = df.copy()
-    columnas_texto = df_temp.select_dtypes(include=['object']).columns.tolist()
+def codificar_categoricos_inteligente(df, metadata):
 
-    if len(columnas_texto) > 0:
-        # PANDAS MAGIC: Le decimos directamente que queremos 1s y 0s con dtype=int
-        df_temp = pd.get_dummies(df_temp, columns=columnas_texto, dtype=int)
+    df_temp = df.copy()
+
+    columnas_onehot = [
+        col for col,meta in metadata.items()
+        if meta["tipo"] == "categorico_bajo"
+    ]
+
+    if len(columnas_onehot) > 0:
+
+        df_temp = pd.get_dummies(
+            df_temp,
+            columns=columnas_onehot,
+            dtype="int8"
+        )
 
     return df_temp
 
