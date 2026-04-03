@@ -1,4 +1,12 @@
-# 📊 Proyecto de Estadística - Guía para el Equipo
+# 💎 CORA (Data Intelligent Assistant)
+
+**CORA** es una plataforma interactiva de preprocesamiento, limpieza y diagnóstico de datos construida con **Streamlit** y **Pandas**. Diseñada para simplificar y automatizar el trabajo sucio de la ciencia de datos, CORA transforma datasets caóticos en estructuras *AI-Ready* en tiempo real.
+
+Equipo de desarrollo: **DIA**. un sharaut para los 11 fundadores. puro pinche CDIA alv pa pura gente del señor checo y el señor lalo viejon
+
+---
+
+## 📊 Proyecto de Estadística - Guía para el Equipo
 
 ¡Qué onda banda! Aquí están las reglas del juego para armar este software en 4 semanas sin matarnos entre nosotros. Somos 8, así que si nos organizamos, sale al puro centavo.
 
