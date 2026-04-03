@@ -1,8 +1,8 @@
-# 💎 CORA (Data Intelligent Assistant)
+# CORA Analysis
 
-**CORA** es una plataforma interactiva de preprocesamiento, limpieza y diagnóstico de datos construida con **Streamlit** y **Pandas**. Diseñada para simplificar y automatizar el trabajo sucio de la ciencia de datos, CORA transforma datasets caóticos en estructuras *AI-Ready* en tiempo real.
+**CORA** es una plataforma interactiva de preprocesamiento, limpieza y análisis estadístico de datos construida con **Streamlit** y **Pandas**. Diseñada para simplificar y automatizar el trabajo sucio de la ciencia de datos, CORA transforma datasets caóticos en estructuras *AI-Ready* en tiempo real, para su posterior análisis estadístico.
 
-Equipo de desarrollo: **DIA**. un sharaut para los 11 fundadores. puro pinche CDIA alv pa pura gente del señor checo y el señor lalo viejon
+Equipo de desarrollo: **DIA**. un sharaut para los 11 fundadores. puro pinche CDIA alv pa pura gente del señor checo y el señor lalo viejon chau
 
 ---
 
