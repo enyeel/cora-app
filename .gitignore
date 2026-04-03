@@ -8,6 +8,7 @@ __pycache__/
 modules/__pycache__/
 **/__pycache__/
 *.py[cod]
+test.py
 
 # csv files
 *.csv
