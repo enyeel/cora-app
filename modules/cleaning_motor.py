@@ -1,6 +1,25 @@
 import pandas as pd
 import numpy as np
 
+def aplicar_estructural(df, config):
+    df_est = df.copy()
+    if config.get("estructural", {}).get("enabled", True):
+        cols_to_drop = config["estructural"].get("drop_cols", [])
+        cols_to_coerce = config["estructural"].get("coerce_cols", [])
+
+        # 1. Ejecutar al pendejo (Dropear columnas inútiles)
+        cols_to_drop_valid = [c for c in cols_to_drop if c in df_est.columns]
+        if cols_to_drop_valid:
+            df_est = df_est.drop(columns=cols_to_drop_valid)
+
+        # 2. Convertir a los rebeldes (Coerción a numérico)
+        for col in cols_to_coerce:
+            if col in df_est.columns:
+                # La magia pura: convierte a número, si no puede, lo hace NaN
+                df_est[col] = pd.to_numeric(df_est[col], errors='coerce')
+
+    return df_est
+
 def aplicar_outliers(df, mapa_outliers, config):
     df_out = df.copy()
     if config.get("outliers", {}).get("enabled", False):

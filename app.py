@@ -1,10 +1,11 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+from pandas.api.types import is_numeric_dtype
 
 # IMPORTAMOS NUESTRAS ARMAS
 from modules.cleaning import detectar_outliers, detectar_webones
-from modules.cleaning_motor import aplicar_outliers, aplicar_webones, aplicar_nulos
+from modules.cleaning_motor import aplicar_estructural, aplicar_outliers, aplicar_webones, aplicar_nulos
 
 # =======================================================
 # 🖥️ LA INTERFAZ DE USUARIO (UI) - BRANDING DIA
@@ -43,6 +44,7 @@ if archivo_subido is not None:
         
         # Reiniciamos la memoria de decisiones al subir nuevo archivo
         st.session_state['pipeline_config'] = {
+            "estructural": {"enabled": True, "drop_cols": [], "coerce_cols": []}, # <-- NUEVO
             "outliers": {"enabled": True, "acciones_por_fila": {}},
             "webones": {"enabled": True, "acciones_por_fila": {}},
             "imputacion": {"enabled": True, "estrategia_global": "Media", "acciones_por_columna": {}}
@@ -102,6 +104,84 @@ if archivo_subido is not None:
     st.divider()
 
     # ==========================================
+    # 👻 SECCIÓN 1.5: LIMPIEZA ESTRUCTURAL 
+    # ==========================================
+    cols_100_nulos = []
+    cols_peligro_nulos = []
+    coercion_info = {} # Guardará el nombre de la columna y un DataFrame con los intrusos
+
+    # 🕵️‍♂️ LÓGICA DE DETECCIÓN AUTOMÁTICA
+    for col in df_original.columns:
+        pct_nulos = df_original[col].isnull().mean()
+        
+        # Detectar vacías
+        if pct_nulos == 1.0:
+            cols_100_nulos.append(col)
+        elif pct_nulos >= 0.60:
+            cols_peligro_nulos.append(col)
+
+        # Detectar coerción y atrapar a los rebeldes
+        if not is_numeric_dtype(df_original[col]):
+            s_orig = df_original[col]
+            s_num = pd.to_numeric(s_orig, errors='coerce')
+            
+            # Máscara: Era un dato válido originalmente, pero to_numeric lo destrozó (lo hizo NaN)
+            mask_rebeldes = s_orig.notna() & s_num.isna()
+            
+            # Validamos que al menos haya un número real y calculamos la tasa de éxito
+            if s_num.notna().any():
+                tasa_exito = s_num.notna().sum() / s_orig.notna().sum()
+                # Si la mayoría son números y hay al menos un rebelde
+                if tasa_exito > 0.50 and mask_rebeldes.any():
+                    # Guardamos las filas exactas donde están los weyes raros
+                    df_rebeldes = df_original.loc[mask_rebeldes, [col]]
+                    coercion_info[col] = df_rebeldes
+
+    # 🖥️ RENDERIZADO CONDICIONAL
+    if cols_100_nulos or cols_peligro_nulos or coercion_info:
+        st.header("1.5. Limpieza Estructural (Auto-Detect)")
+        st.info("💡 **CEXO AI** encontró anomalías estructurales antes de empezar el análisis.")
+
+        pipeline_config["estructural"]["drop_cols"] = []
+        pipeline_config["estructural"]["coerce_cols"] = []
+
+        if cols_100_nulos:
+            st.error(f"💀 **Columnas 100% Vacías:** `{', '.join(cols_100_nulos)}`\n\n*Eliminadas automáticamente.*")
+            pipeline_config["estructural"]["drop_cols"].extend(cols_100_nulos)
+
+        if cols_peligro_nulos:
+            st.warning("⚠️ **Columnas Zombie (>60% vacías):** Te sugerimos eliminarlas.")
+            for col in cols_peligro_nulos:
+                pct = df_original[col].isnull().mean() * 100
+                if st.checkbox(f"Eliminar `{col}` ({pct:.0f}% nulos)", value=True, key=f"drop_{col}"):
+                    pipeline_config["estructural"]["drop_cols"].append(col)
+            st.divider()
+
+        if coercion_info:
+            st.success("🔄 **Datos Intrusos Detectados:**")
+            st.write("Se encontraron textos en columnas numéricas. Revisa a los sospechosos:")
+            
+            # Hacemos una tablita y un checkbox independiente por cada columna afectada
+            for col, df_rebeldes in coercion_info.items():
+                st.markdown(f"### 🕵️ Columna: `{col}`")
+                
+                # Mostramos los datos raros en un mini dataframe
+                st.dataframe(df_rebeldes, use_container_width=True)
+                
+                # Checkbox con la cantidad exacta de valores a neutralizar
+                if st.checkbox(f"Neutralizar estos {len(df_rebeldes)} valores a NaN", value=True, key=f"coerce_{col}"):
+                    pipeline_config["estructural"]["coerce_cols"].append(col)
+                
+                st.divider()
+
+    # 🚀 APLICAMOS LA MAGIA ESTRUCTURAL
+    df_estructural = aplicar_estructural(df_original, pipeline_config)
+    
+    # 🧠 RECALCULAMOS DETECTORES (Super importante para las sig. secciones)
+    mapa_outliers, cols_con_outliers = detectar_outliers(df_estructural)
+    filas_webones = detectar_webones(df_estructural)
+
+    # ==========================================
     # 🎯 SECCIÓN 2: TRATAMIENTO QUIRÚRGICO (OUTLIERS)
     # ==========================================
     tratar_activado = st.toggle("Habilitar Tratamiento de Outliers", value=pipeline_config["outliers"]["enabled"])
@@ -110,7 +190,7 @@ if archivo_subido is not None:
     if tratar_activado:
         st.markdown("### 2. Tratamiento Quirúrgico de Outliers")
         filas_con_outliers = mapa_outliers.any(axis=1)
-        df_contexto_outliers = df_original.loc[filas_con_outliers].copy()
+        df_contexto_outliers = df_estructural.loc[filas_con_outliers].copy()
 
         if not df_contexto_outliers.empty:
             df_contexto_outliers = df_contexto_outliers.reset_index()
@@ -161,7 +241,7 @@ if archivo_subido is not None:
         st.info("⚠️ El tratamiento de outliers está desactivado.")
 
     # 🧠 TRUCO 2: Aplicar HASTA EL FINAL de la sección, ya que recolectamos las decisiones
-    df_sin_outliers = aplicar_outliers(df_original, mapa_outliers, pipeline_config)
+    df_sin_outliers = aplicar_outliers(df_estructural, mapa_outliers, pipeline_config)
 
     st.divider()
 
