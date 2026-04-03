@@ -2,10 +2,72 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from pandas.api.types import is_numeric_dtype
-
-# IMPORTAMOS NUESTRAS ARMAS
 from modules.cleaning import detectar_outliers, detectar_webones
 from modules.cleaning_motor import aplicar_estructural, aplicar_outliers, aplicar_webones, aplicar_nulos
+
+def renderizar_df_paginado(
+    df,
+    pintar_func=None,
+    style_mode="apply",   # "apply" o "map"
+    formatter=None,
+    height=300,
+    page_size=200,
+    key="tabla"
+):
+
+    total_filas = len(df)
+    total_paginas = max(1, (total_filas - 1) // page_size + 1)
+
+    col1, col2 = st.columns([1,4])
+
+    with col1:
+        pagina = st.number_input(
+            "Página",
+            min_value=1,
+            max_value=total_paginas,
+            value=1,
+            key=f"{key}_pagina"
+        )
+
+    with col2:
+        st.caption(f"Mostrando filas {(pagina-1)*page_size+1} - {min(pagina*page_size,total_filas)} de {total_filas}")
+
+    start = (pagina-1) * page_size
+    end = start + page_size
+
+    df_page = df.iloc[start:end]
+
+    # aplicar estilos
+    if pintar_func:
+
+        styler = df_page.style
+
+        if style_mode == "apply":
+            styler = styler.apply(pintar_func, axis=None)
+
+        elif style_mode == "map":
+            metodo_map = getattr(styler, "map", getattr(styler, "applymap", None))
+            styler = metodo_map(pintar_func)
+
+        if formatter:
+            styler = styler.format(formatter=formatter, na_rep="NaN")
+
+        st.dataframe(
+            styler,
+            height=height,
+            width="stretch"
+        )
+
+    else:
+
+        if formatter:
+            df_page = df_page.style.format(formatter=formatter, na_rep="NaN")
+
+        st.dataframe(
+            df_page,
+            height=height,
+            width="stretch"
+        )
 
 # =======================================================
 # 🖥️ LA INTERFAZ DE USUARIO (UI) - BRANDING DIA
@@ -44,18 +106,31 @@ if archivo_subido is not None:
         
         # Reiniciamos la memoria de decisiones al subir nuevo archivo
         st.session_state['pipeline_config'] = {
-            "estructural": {"enabled": True, "drop_cols": [], "coerce_cols": []}, # <-- NUEVO
+            "estructural": {"enabled": True, "drop_cols": [], "coerce_cols": []},
             "outliers": {"enabled": True, "acciones_por_fila": {}},
             "webones": {"enabled": True, "acciones_por_fila": {}},
             "imputacion": {"enabled": True, "estrategia_global": "Media", "acciones_por_columna": {}}
         }
 
+        if 'df_chido' in st.session_state:
+            del st.session_state['df_chido']
+
+        @st.cache_data
+        def detectar_outliers_cache(df):
+            return detectar_outliers(df)
+
+        @st.cache_data
+        def detectar_webones_cache(df):
+            return detectar_webones(df)
+
         # Recalculamos los detectores
-        mapa_out, cols_out = detectar_outliers(df_raw)
+        mapa_out, cols_out = detectar_outliers_cache(df_raw)
         st.session_state['mapa_outliers'] = mapa_out
         st.session_state['cols_con_outliers'] = cols_out
-        st.session_state['filas_webones'] = detectar_webones(df_raw)
+        st.session_state['filas_webones'] = detectar_webones_cache(df_raw)
 
+# RENDERIZAR LA INTERFAZ (Solo si hay datos en memoria)
+if 'df_original' in st.session_state:
     # Recuperamos las variables
     df_original = st.session_state['df_original']
     mapa_outliers = st.session_state['mapa_outliers']
@@ -67,6 +142,17 @@ if archivo_subido is not None:
     total_nulos = df_original.isna().sum().sum()
     total_outliers = mapa_outliers.sum().sum()
     total_webones = filas_webones.sum()
+
+    st.success(f"🗃️ Trabajando con el dataset en memoria: **{st.session_state['nombre_archivo']}**")
+
+    # Botón de pánico por si el usuario quiere resetear la UI a la fuerza
+    if st.button("🗑️ Limpiar memoria y empezar de cero", type="secondary"):
+        for key in ['df_original', 'nombre_archivo', 'pipeline_config', 'df_chido']:
+            if key in st.session_state:
+                del st.session_state[key]
+        st.rerun() # Esto recarga la página instantáneamente
+        
+    st.divider()
 
     # ==========================================
     # 🩻 SECCIÓN 1: RAYOS X
@@ -90,9 +176,13 @@ if archivo_subido is not None:
         for col in df_original.select_dtypes(include=[np.number]).columns
     }
 
-    st.dataframe(
-        df_original.style.apply(pintar_rayos_x, axis=None).format(formatter=formatos_columnas, na_rep="NaN"), 
-        height=350, width='stretch'
+    renderizar_df_paginado(
+        df_original,
+        pintar_func=pintar_rayos_x,
+        style_mode="apply",
+        formatter=formatos_columnas,
+        height=350,
+        key="rayosx"
     )
     
     col1, col2, col3, col4 = st.columns(4)
@@ -331,9 +421,13 @@ if archivo_subido is not None:
                 return 'background-color: rgba(255, 75, 75, 0.3)' if pd.isna(val) else ''
             
             metodo_map = getattr(filas_con_nulos.style, 'map', getattr(filas_con_nulos.style, 'applymap', None))
-            st.dataframe(
-                metodo_map(pintar_celdas_nulas).format(formatter=formatos_columnas, na_rep="NaN"),
-                height=250, width='stretch'
+            renderizar_df_paginado(
+                filas_con_nulos,
+                pintar_func=pintar_celdas_nulas,
+                style_mode="map",
+                formatter=formatos_columnas,
+                height=250,
+                key="nulos"
             )
             
             st.markdown("🛠️ **Acciones por Columna:**")
@@ -427,11 +521,72 @@ if archivo_subido is not None:
         estilos[data.isna()] = 'background-color: rgba(255, 75, 75, 0.6);'
         return estilos
 
-    st.dataframe(
-        df_final.style.apply(pintar_final, axis=None).format(formatter=formatos_columnas, na_rep="NaN"), 
-        height=300, 
-        width='stretch'
+    renderizar_df_paginado(
+        df_final,
+        pintar_func=pintar_final,
+        style_mode="apply",
+        formatter=formatos_columnas,
+        height=300,
+        key="final"
     )
 
     if nulos_finales > 0:
         st.warning(f"⚠️ **Aviso:** Tu dataset final aún tiene **{nulos_finales}** valores nulos. Asegúrate de que los módulos posteriores de análisis soporten datos faltantes.")
+    
+    st.divider()
+
+    # ==========================================
+    # 🚀 SECCIÓN 6: EXPORTAR Y ANALIZAR
+    # ==========================================
+    st.header("6. Exportar y Analizar 🚀")
+    
+    col1, col2 = st.columns(2)
+    
+    # --- BOTÓN 1: DESCARGAR CSV ---
+    with col1:
+        # Convertimos el DF a CSV
+        csv = df_imputado.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="⬇️ Descargar Dataset Limpio (CSV)",
+            data=csv,
+            file_name="dataset_al_ready_cora.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+
+    # --- BOTÓN 2: MANDAR A PRODUCCIÓN Y CLONAR ---
+    with col2:
+        if st.button("✅ Confirmar y Mandar a Análisis", type="primary", use_container_width=True):
+            
+            # 1. Guardar "El Chido" (Limpio, tal cual lo ve el usuario)
+            st.session_state['df_chido'] = df_imputado.copy()
+            
+            # 2. Generar y guardar el clon ENCODED (One-Hot Encoding)
+            # pd.get_dummies convierte textos/categorías en columnas de 0s y 1s.
+            # drop_first=True evita la multicolinealidad perfecta (ideal para modelos)
+            # dtype=int asegura que salgan 1s y 0s en vez de True/False
+            df_encoded = pd.get_dummies(df_imputado, drop_first=True, dtype=int)
+            st.session_state['df_encoded'] = df_encoded.copy()
+            
+            # 3. Generar y guardar el clon SCALED (Estandarizado)
+            from sklearn.preprocessing import StandardScaler
+            scaler = StandardScaler()
+            
+            df_scaled = df_encoded.copy()
+            # Agarramos todas las columnas numéricas (que ahora incluyen las dummy)
+            cols_numericas = df_scaled.select_dtypes(include=['number']).columns
+            
+            # Aplicamos la estandarización (media 0, desviación estándar 1)
+            if not cols_numericas.empty:
+                df_scaled[cols_numericas] = scaler.fit_transform(df_scaled[cols_numericas])
+            
+            st.session_state['df_scaled'] = df_scaled
+
+            # El usuario no se entera del desmadre matemático que acaba de ocurrir atrás jsjs
+            st.success("¡Dataset bloqueado! Versiones matemáticas generadas en memoria. Ya puedes navegar a los módulos de análisis.")
+            st.balloons()
+
+else:
+    # Si no hay nada en memoria, mostramos un mensaje y detenemos la ejecución de la app
+    st.info("👆 Sube un dataset para comenzar el proceso de limpieza.")
+    st.stop()
