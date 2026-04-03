@@ -92,7 +92,7 @@ if archivo_subido is not None:
 
     st.dataframe(
         df_original.style.apply(pintar_rayos_x, axis=None).format(formatter=formatos_columnas, na_rep="NaN"), 
-        height=350, use_container_width=True
+        height=350, width='stretch'
     )
     
     col1, col2, col3, col4 = st.columns(4)
@@ -166,7 +166,7 @@ if archivo_subido is not None:
                 st.markdown(f"### 🕵️ Columna: `{col}`")
                 
                 # Mostramos los datos raros en un mini dataframe
-                st.dataframe(df_rebeldes, use_container_width=True)
+                st.dataframe(df_rebeldes, width='stretch')
                 
                 # Checkbox con la cantidad exacta de valores a neutralizar
                 if st.checkbox(f"Neutralizar estos {len(df_rebeldes)} valores a NaN", value=True, key=f"coerce_{col}"):
@@ -223,7 +223,7 @@ if archivo_subido is not None:
                 },
                 disabled=cols_intocables,
                 hide_index=True,
-                use_container_width=True,
+                width='stretch',
                 key="editor_outliers"
             )
 
@@ -282,7 +282,7 @@ if archivo_subido is not None:
                 },
                 disabled=cols_intocables_w,
                 hide_index=True,
-                use_container_width=True,
+                width='stretch',
                 key="editor_webones" 
             )
             
@@ -333,7 +333,7 @@ if archivo_subido is not None:
             metodo_map = getattr(filas_con_nulos.style, 'map', getattr(filas_con_nulos.style, 'applymap', None))
             st.dataframe(
                 metodo_map(pintar_celdas_nulas).format(formatter=formatos_columnas, na_rep="NaN"),
-                height=250, use_container_width=True
+                height=250, width='stretch'
             )
             
             st.markdown("🛠️ **Acciones por Columna:**")
@@ -364,7 +364,7 @@ if archivo_subido is not None:
                     "Tipo de Dato": st.column_config.Column(disabled=True),
                     "Nulos Iniciales": st.column_config.Column(disabled=True),
                 },
-                hide_index=True, use_container_width=True, key="editor_nulos"
+                hide_index=True, width='stretch', key="editor_nulos"
             )
             
             pipeline_config["imputacion"]["acciones_por_columna"].clear()
@@ -430,7 +430,7 @@ if archivo_subido is not None:
     st.dataframe(
         df_final.style.apply(pintar_final, axis=None).format(formatter=formatos_columnas, na_rep="NaN"), 
         height=300, 
-        use_container_width=True
+        width='stretch'
     )
 
     if nulos_finales > 0:
