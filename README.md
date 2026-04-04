@@ -1,83 +1,91 @@
-# CORA Analysis
+# CORA: Plataforma Interactiva de Preprocesamiento y Análisis Estadístico
 
-**CORA** es una plataforma interactiva de preprocesamiento, limpieza y análisis estadístico de datos construida con **Streamlit** y **Pandas**. Diseñada para simplificar y automatizar el trabajo sucio de la ciencia de datos, CORA transforma datasets caóticos en estructuras *AI-Ready* en tiempo real, para su posterior análisis estadístico.
+[](https://cora-app-c-dia.streamlit.app/)
+[](https://www.python.org/)
+[](https://cora-app-c-dia.streamlit.app/)
 
-Equipo de desarrollo: **DIA**. un sharaut para los 11 fundadores. puro pinche CDIA alv pa pura gente del señor checo y el señor lalo viejon chau
+**[Prueba CORA en vivo aquí](https://cora-app-c-dia.streamlit.app/)**
 
----
+## ¿Qué es CORA?
 
-## 📊 Proyecto de Estadística - Guía para el Equipo
+**CORA** es una plataforma web interactiva de ciencia de datos construida con Streamlit. Diseñada para agilizar el ciclo de vida de los datos, CORA automatiza el trabajo pesado del preprocesamiento (limpieza, imputación de nulos, manejo de *outliers* y estandarización) y permite a los usuarios ejecutar modelos estadísticos complejos con una interfaz visual, intuitiva y *AI-Ready*.
 
-¡Qué onda banda! Aquí están las reglas del juego para armar este software en 4 semanas sin matarnos entre nosotros. Somos 8, así que si nos organizamos, sale al puro centavo.
+Transformamos *datasets* caóticos en *insights* accionables en cuestión de segundos, sin necesidad de escribir una sola línea de código.
 
-La arquitectura es sencilla: **Yo (Alex) armo la interfaz web y les paso los datos limpios. Ustedes hacen la magia matemática en sus módulos y me regresan los resultados para que yo los muestre.**
+-----
 
----
+## Arquitectura y Módulos Principales
 
-## 🏗️ 1. Arquitectura General y Carpetas
-Vamos a usar **Streamlit** para que se vea como página web sin tener que pelearnos con HTML/CSS. 
+El sistema está construido bajo una arquitectura modular, separando la interfaz de usuario (*Frontend*) de la lógica matemática (*Backend*). Cada módulo de análisis fue desarrollado por especialistas del equipo:
 
-Nadie toca mi archivo principal (`app.py`). Cada equipo va a trabajar en su propio archivo de Python dentro de la carpeta `modules/`. La estructura del proyecto es esta:
+### 1\. Motor de Carga y Limpieza Inteligente
 
-```code
-proyecto_estadistica/
-│
-├── app.py                 # El front con Streamlit (Chamba de Alex)
-├── requirements.txt       # Las librerías que vamos a usar
-│
-├── data/                  # Aquí metan sus CSVs para hacer pruebas
-│
-└── modules/               # LA CHAMBA DE USTEDES:
-    ├── __init__.py        # NO BORRAR. Archivo vacío para que funcionen los imports
-    ├── descriptiva.py     # Carlos y Fani
-    ├── factorial.py       # Karina y Emiliano
-    ├── discriminante.py   # Lora y Sebastian
-    └── conglomerados.py   # Fernando y Emilio
-```
+  * **Autor(es):** [Angel] ([@enyeel](https://github.com/enyeel))
+  * **Descripción:** Pipeline de ingesta de datos (.csv/.xlsx) que detecta automáticamente columnas inútiles, aplica imputación inteligente de valores nulos (media/mediana/moda), estandarización Z-Score, One-Hot Encoding para variables categóricas y filtra registros anómalos o "webones". Integra el estado de la aplicación mediante `st.session_state` para un flujo ininterrumpido.
 
-## 🤝 2. ¿Cómo nos conectamos? (Input y Output)
-Yo me encargo de cargar la Base de Datos (.csv o .xlsx), quitar los nulos y dejarla lista.
-- **Lo que yo les doy (Input):** Sus funciones principales deben recibir un DataFrame de Pandas ya limpio.
-- **Lo que ustedes me regresan (Output):** Su función debe devolver un diccionario, un nuevo DataFrame, o un objeto de gráfica (figura) que yo pueda agarrar y mostrar en la web.
+### 2\. Estadística Descriptiva
 
+  * **Autor(es):** [Carlos] ([@GithubCarlos](https://www.google.com/search?q=link)) y [Fani] ([@GithubFani](https://www.google.com/search?q=link))
+  * **Descripción:** Análisis exploratorio de datos (EDA) automatizado. Genera medidas de tendencia central, dispersión, asimetría y tablas de frecuencia dinámicas. Incluye visualizaciones interactivas para entender la distribución inicial de los datos.
 
-**🚨 LA REGLA DE ORO: ¡PROHIBIDO** usar ```print()``` o ```plt.show()```! Si usan eso, se imprime en la consola, no en la página web. Todo debe tener un return.
+### 3\. Análisis Factorial Exploratorio (AFE)
 
+  * **Autor(es):** [Karina] ([@GithubKarina](https://www.google.com/search?q=link)) y [Emiliano] ([@GithubEmiliano](https://www.google.com/search?q=link))
+  * **Descripción:** Módulo de reducción de dimensionalidad. Ejecuta pruebas de viabilidad (KMO y Bartlett), elimina multicolinealidad dinámicamente y calcula cargas factoriales utilizando rotación Varimax. Incluye la visualización del *Scree Plot* y mapas de calor interactivos.
 
-Ejemplo de cómo debe verse su código en su archivo de módulo:
+### 4\. Análisis Discriminante Lineal (LDA)
 
-```Python
-import pandas as pd
-# import plotly.express as px ... etc
+  * **Autor(es):** [Lora/Yara] ([@GithubYara](https://www.google.com/search?q=link)) y [Sebastian] ([@GithubSebas](https://www.google.com/search?q=link))
+  * **Descripción:** Algoritmo supervisado para clasificación y evaluación de variables predictoras. Genera funciones discriminantes, calcula centroides por grupo, matrices de confusión y ejecuta el test de Box M para evaluar la homogeneidad de las covarianzas.
 
-def hacer_calculos(df_limpio):
-    # Aquí hacen todo su desmadre
-    resultados_tabla = df_limpio.describe()
-    
-    # Regresan la tabla o gráfica para que yo la muestre
-    return resultados_tabla
-```
+### 5\. Análisis de Conglomerados (Clustering)
 
-## 🛠️ 3. Tareas y Librerías por Equipo
+  * **Autor(es):** Fernando ([@GithubFer](https://www.google.com/search?q=link)) y Emilio ([@GithubEmilio](https://www.google.com/search?q=link))
+  * **Descripción:** Segmentación mediante IA no supervisada. Soporta modelos no jerárquicos (K-Means) apoyados por el Método del Codo, y algoritmos jerárquicos ilustrados mediante Dendrogramas interactivos. Evalúa la calidad de la agrupación a través del *Silhouette Score*.
 
-### 📈 Carlos y Fani: Estadística Descriptiva (```modules/descriptive.py```)
-- **Misión:** Sacar medidas de tendencia central, dispersión, forma y tablas de frecuencias. Gráficos básicos.
-- **Librerías recomendadas:** ```pandas```, ```scipy.stats```.
-- **Gráficas:** Usen ```plotly.express``` o ```seaborn```. Recuerden devolver la figura (el objeto fig).
+-----
 
-### 🧩 Karina y Emiliano: Análisis Factorial (```modules/factorial.py```)
-- **Misión:** Reducción de dimensiones. Matriz de correlaciones, prueba KMO, Bartlett, matriz de cargas factoriales y varianza explicada.
-- **Librerías recomendadas:** ```factor_analyzer``` y ```pandas```.
+## Stack Tecnológico
 
-### 🎯 Yara y Sebastian: Análisis Discriminante (```modules/discriminant.py```)
-- **Misión:** Clasificar o ver qué variables discriminan mejor entre grupos.
-- **Librerías recomendadas:** ```scikit-learn``` (```LinearDiscriminantAnalysis```).
-- **Ojo:** Su función va a necesitar recibir el DataFrame limpio y la variable objetivo.
+  * **Frontend y Framework Web:** `Streamlit`
+  * **Manipulación de Datos:** `Pandas`, `NumPy`
+  * **Machine Learning y Estadística:** `Scikit-Learn`, `SciPy`, `factor_analyzer`
+  * **Visualización de Datos:** `Plotly`, `Seaborn`, `Matplotlib`
 
-### 🌌 Fernando y Emilio: Conglomerados (```modules/clustering.py```)
-- **Misión:** Agrupar los datos. Modelo No Jerárquico (K-Means) y Jerárquico con Dendrograma.
-- **Librerías recomendadas:** ```scikit-learn``` (```KMeans```, ```AgglomerativeClustering```) y ```scipy.cluster.hierarchy```.
+-----
 
-## 🚨 4. Flujo de Trabajo (Git)
-- Descarguen el repo (git clone).
-- Hagan sus commits y push avisando por WhatsApp qué subieron.
+## Instalación y Despliegue Local
+
+Si deseas clonar este repositorio y ejecutar CORA en tu entorno local, sigue estos pasos:
+
+1.  Clona este repositorio:
+    ```
+    git clone [https://github.com/TuUsuario/cora-app.git](https://www.google.com/search?q=https://github.com/TuUsuario/cora-app.git)
+    cd cora-app
+    ```
+
+3.  Instala las dependencias necesarias:
+    ```
+    pip install -r requirements.txt
+    ```
+
+4.  Inicia la aplicación:
+    ```
+    streamlit run app.py
+    ```
+
+-----
+
+## Equipo de Desarrollo y Propiedad Intelectual
+
+**CORA** fue diseñado y desarrollado con orgullo por el equipo **DIA**.
+
+Este software es un proyecto integral desarrollado para demostrar la aplicación práctica de modelado estadístico, automatización de *pipelines* de datos y despliegue de aplicaciones web analíticas.
+
+### Créditos de Autoría y Legado
+
+Todo el código fuente, la arquitectura modular, el diseño de la interfaz y la integración matemática es **propiedad intelectual exclusiva de los autores y fundadores del equipo DIA.** Este trabajo consolida meses de desarrollo estructurado y se presenta en honor al legado del programa de Técnico Superior Universitario (TSU) en **Ciencia de Datos Área Inteligencia Artificial (CDIA)**.
+
+Quedan estrictamente reservados los derechos de autoría intelectual y patrimonial. Ninguna entidad, ajena a los desarrolladores aquí listados, está autorizada para comercializar, adjudicarse la autoría o vender licencias de este software sin el consentimiento explícito del equipo desarrollador.
+
+**💎 Puro pinche CDIA.**
