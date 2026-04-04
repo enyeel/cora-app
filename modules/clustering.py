@@ -55,7 +55,7 @@ def aplicar_kmeans(df_limpio, datos_escalados, n_clusters):
     df_res = df_limpio.copy()
     df_res['Cluster'] = etiquetas.astype(str)
 
-    score = silhouette_score(datos_escalados, etiquetas)
+    score = silhouette_score(datos_escalados, etiquetas, sample_size=10000, random_state=42)
     return df_res, modelo, score
 
 # --- ALGORITMO: JERÁRQUICO ---
@@ -73,20 +73,22 @@ def aplicar_jerarquico(df_limpio, datos_escalados, n_clusters, max_filas=10000):
     etiquetas = modelo.fit_predict(datos_proc)
 
     df_res['Cluster'] = etiquetas.astype(str)
-    score = silhouette_score(datos_proc, etiquetas)
+    score = silhouette_score(datos_proc, etiquetas, sample_size=2500, random_state=42)
     return df_res, score
 
-# ---  GRÁFICA: DISPERSIÓN ---
-def generar_grafica_clusters(df_resultado, modelo_kmeans=None, scaler=None):
+# --- GRÁFICA: DISPERSIÓN (PARCHEADA) ---
+def generar_grafica_clusters(df_resultado, x_col, y_col, modelo_kmeans=None, scaler=None):
     """Genera el Scatter Plot interactivo con centroides si aplica."""
     fig = px.scatter(
-        df_resultado, x='followers', y='popularity', color='Cluster',
-        hover_data=['name'], template='plotly_dark',
+        df_resultado, x=x_col, y=y_col, color='Cluster',
+        template='plotly_dark',
         title="Visualización de Segmentos Resultantes"
     )
 
     if modelo_kmeans is not None and scaler is not None:
         centroides = scaler.inverse_transform(modelo_kmeans.cluster_centers_)
+        # NOTA: Los centroides se calculan para TODAS las columnas usadas.
+        # Aquí graficamos solo las posiciones 0 (X) y 1 (Y) correspondientes a las columnas elegidas.
         fig.add_trace(go.Scatter(
             x=centroides[:, 0], y=centroides[:, 1], mode='markers',
             marker=dict(color='white', size=15, symbol='x'), name='Centroides'
@@ -104,7 +106,12 @@ def generar_dendrograma(datos_escalados, muestra_max=100):
 
     Z = linkage(datos_ready, method='ward')
     fig = ff.create_dendrogram(datos_ready, colorscale=px.colors.qualitative.Prism)
-    fig.update_layout(template='plotly_dark', title="Dendrograma de Agrupación Jerárquica")
+
+    fig.update_layout(
+        template='plotly_dark', 
+        title="Dendrograma de Agrupación Jerárquica",
+        height=600  
+    )
     return fig
 
 
