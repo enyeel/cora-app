@@ -128,7 +128,10 @@ if 'df_original' in st.session_state:
         return estilos
 
     formatos_columnas = {
-        col: "{:.0f}" if not df_original[col].dropna().empty and all(x.is_integer() for x in df_original[col].dropna()) else "{}"
+        col: "{:.0f}" 
+        if not df_original[col].dropna().empty 
+        and all(float(x).is_integer() for x in df_original[col].dropna()) 
+        else "{}"
         for col in df_original.select_dtypes(include=[np.number]).columns
     }
 
