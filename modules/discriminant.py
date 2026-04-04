@@ -6,7 +6,6 @@ from scipy import stats
 import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
-import streamlit as st
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -22,49 +21,47 @@ def box_m_test(X, y):
     # Calcular los grados de libertad
     df = 0.5 * n_features * (n_features + 1) * (n_groups - 1)
     
-    # Calcular el estadístico M
-    M = 0
-    valid_groups = 0
+    # Calcular la matriz de covarianza combinada
+    cov_pooled = np.zeros((n_features, n_features))
+    total_df = 0
     for g in groups:
         n_g = np.sum(y == g)
         X_g = X[y == g]
-        if n_g > 1 and len(X_g) > n_features:
-            cov_g = np.cov(X_g.T)
-            if np.linalg.det(cov_g) > 0:
-                valid_groups += 1
-    
-    if valid_groups < 2:
+        if n_g > n_features:  # Suficientes datos
+            cov_g = np.cov(X_g.T, ddof=1)
+            cov_pooled += (n_g - 1) * cov_g
+            total_df += n_g - 1
+    if total_df == 0:
         return {
             "estadistico_M": np.nan,
             "grados_libertad": df,
             "chi2": np.nan,
             "p_valor": np.nan,
-            "interpretacion": "No se pudo calcular (posiblemente por falta de datos en algunos grupos)"
+            "interpretacion": "No se pudo calcular (falta de datos)"
         }
+    cov_pooled /= total_df
     
-    # Calcular la matriz de covarianza combinada
-    cov_pooled = np.cov(X.T)
-    
+    # Calcular M
     M = 0
     for g in groups:
         n_g = np.sum(y == g)
         X_g = X[y == g]
-        if n_g > 1:
-            cov_g = np.cov(X_g.T)
-            if np.linalg.det(cov_g) > 0 and np.linalg.det(cov_pooled) > 0:
+        if n_g > n_features:
+            cov_g = np.cov(X_g.T, ddof=1)
+            if np.linalg.det(cov_g) > 0:
                 M += (n_g - 1) * np.log(np.linalg.det(cov_pooled) / np.linalg.det(cov_g))
     
     chi2_stat = M
-    p_value = 1 - stats.chi2.cdf(chi2_stat, df)
+    p_value = 1 - stats.chi2.cdf(chi2_stat, df) if not np.isnan(M) else np.nan
     
     return {
         "estadistico_M": M,
         "grados_libertad": df,
         "chi2": chi2_stat,
         "p_valor": p_value,
-        "interpretacion": "⚠️ Se rechaza H0 (matrices diferentes) - considerar QDA" 
-                        if p_value < 0.05 
-                        else "✅ No se rechaza H0 (matrices homogéneas) - válido para LDA"
+        "interpretacion": "⚠️ Rechaza H0 (matrices diferentes) - considera QDA" 
+                        if p_value < 0.05 and not np.isnan(p_value) 
+                        else "✅ No rechaza H0 (matrices homogéneas) - válido para LDA"
     }
 
 def mostrar_interfaz_analisis_discriminante(df):
