@@ -3,12 +3,12 @@ streamlit
 
 # --- Manejo y Limpieza de Datos ---
 pandas
-numpy
+numpy==1.26.4
 openpyxl
 
 # --- Estadística y Machine Learning ---
 scipy
-scikit-learn
+scikit-learn==1.4.2
 factor_analyzer
 
 # --- Gráficos ---
