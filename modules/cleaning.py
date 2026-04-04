@@ -97,17 +97,44 @@ def codificar_categoricos_inteligente(df, metadata):
 # ==========================================
 # FUNCION 5: ESTANDARIZACIÓN Z-SCORE
 # ==========================================
-def estandarizar_zscore(df, columnas_excluir=['ID_Usuario']):
-    """Aplica Z-Score a las columnas numéricas que no sean binarias o IDs."""
+def estandarizar_zscore(df, metadata=None, columnas_excluir=None):
+    """Aplica Z-Score a las columnas numéricas que no sean binarias o IDs.
+
+    Parámetros:
+    - df: DataFrame a transformar.
+    - metadata: diccionario devuelto por `analizar_dataframe` (opcional). Si se entrega,
+      las columnas cuyo metadata indique `categorico_*` serán excluidas automáticamente.
+    - columnas_excluir: lista adicional de columnas a excluir (opcional).
+
+    Retorna un DataFrame con las columnas numéricas seleccionadas estandarizadas.
+    """
     df_temp = df.copy()
     scaler = StandardScaler()
+
+    if columnas_excluir is None:
+        columnas_excluir = []
+
+    # Si hay metadata, excluimos las columnas categóricas detectadas (por ejemplo dummies)
+    cols_excl_from_meta = []
+    if metadata is not None and isinstance(metadata, dict):
+        for col, meta in metadata.items():
+            tipo = meta.get('tipo', '')
+            if isinstance(tipo, str) and tipo.startswith('categorico'):
+                cols_excl_from_meta.append(col)
 
     # Solo agarramos numéricas
     cols_numericas = df_temp.select_dtypes(include=[np.number]).columns.tolist()
 
-    # Filtramos: Quitamos el ID y quitamos las columnas que solo tienen 1s y 0s (Dummies)
-    cols_a_estandarizar = [col for col in cols_numericas
-                           if col not in columnas_excluir and not set(df_temp[col].dropna().unique()).issubset({0, 1})]
+    # Filtramos: Quitamos IDs, columnas excluidas por metadata y las columnas que son binarias (0/1)
+    cols_a_estandarizar = []
+    for col in cols_numericas:
+        if col in columnas_excluir or col in cols_excl_from_meta:
+            continue
+        uniques = df_temp[col].dropna().unique()
+        # Si la columna es estrictamente 0/1 (dummies), la excluimos
+        if set(map(lambda x: int(x) if (isinstance(x, (int, np.integer)) or (isinstance(x, (float, np.floating)) and float(x).is_integer())) else x, uniques)).issubset({0, 1}):
+            continue
+        cols_a_estandarizar.append(col)
 
     if len(cols_a_estandarizar) > 0:
         df_temp[cols_a_estandarizar] = scaler.fit_transform(df_temp[cols_a_estandarizar])

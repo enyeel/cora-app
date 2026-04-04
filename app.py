@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from pandas.api.types import is_numeric_dtype
-from modules.cleaning import detectar_outliers, detectar_webones, codificar_categoricos_inteligente
+from modules.cleaning import detectar_outliers, detectar_webones, codificar_categoricos_inteligente, estandarizar_zscore
 from modules.cleaning_motor import aplicar_estructural, aplicar_outliers, aplicar_webones, aplicar_nulos
 from modules.dataset_profiler import analizar_dataframe
 
@@ -585,22 +585,56 @@ if 'df_original' in st.session_state:
             st.session_state['df_encoded'] = df_encoded.copy()
             
             # 3. Generar y guardar el clon SCALED (Estandarizado)
-            from sklearn.preprocessing import StandardScaler
-            scaler = StandardScaler()
-            
-            df_scaled = df_encoded.copy()
-            # Agarramos todas las columnas numéricas (que ahora incluyen las dummy)
-            cols_numericas = df_scaled.select_dtypes(include=['number']).columns
-            
-            # Aplicamos la estandarización (media 0, desviación estándar 1)
-            if not cols_numericas.empty:
-                df_scaled[cols_numericas] = scaler.fit_transform(df_scaled[cols_numericas])
-            
+            # Usamos la función centralizada `estandarizar_zscore` que consulta la metadata
+            df_scaled = estandarizar_zscore(
+                df_encoded,
+                metadata=st.session_state.get('metadata'),
+                columnas_excluir=['ID_Usuario']
+            )
             st.session_state['df_scaled'] = df_scaled
 
             # El usuario no se entera del desmadre matemático que acaba de ocurrir atrás jsjs
             st.success("¡Dataset bloqueado! Versiones matemáticas generadas en memoria. Ya puedes navegar a los módulos de análisis.")
             st.balloons()
+            
+    # Mostrar sección 7 fuera del bloque del botón: si existen los dataframes, renderizarlos (ancho completo)
+    if 'df_chido' in st.session_state:
+        st.divider()
+        st.header("7. Resultado Guardado y Versiones en Memoria")
+        st.markdown("Revisa las versiones maestras que se han guardado en `st.session_state`.")
+
+        df_chido = st.session_state.get('df_chido')
+        df_encoded = st.session_state.get('df_encoded')
+        df_scaled = st.session_state.get('df_scaled')
+
+        tabs = st.tabs(["Chido (limpio)", "Encoded (One-Hot)", "Scaled (Estandarizado)"])
+
+        with tabs[0]:
+            st.subheader("Dataset limpio (`df_chido`)")
+            try:
+                renderizar_df_paginado(df_chido, formatter=formatos_columnas, height=300, key="result_chido")
+            except Exception:
+                st.dataframe(df_chido)
+
+        with tabs[1]:
+            st.subheader("Encoded (`df_encoded`)")
+            if df_encoded is not None:
+                try:
+                    renderizar_df_paginado(df_encoded, height=300, key="result_encoded")
+                except Exception:
+                    st.dataframe(df_encoded)
+            else:
+                st.info("No hay `df_encoded` en memoria. Confirma y manda a análisis primero.")
+
+        with tabs[2]:
+            st.subheader("Scaled (`df_scaled`)")
+            if df_scaled is not None:
+                try:
+                    renderizar_df_paginado(df_scaled, height=300, key="result_scaled")
+                except Exception:
+                    st.dataframe(df_scaled)
+            else:
+                st.info("No hay `df_scaled` en memoria. Confirma y manda a análisis primero.")
 
 else:
     # Si no hay nada en memoria, mostramos un mensaje y detenemos la ejecución de la app
