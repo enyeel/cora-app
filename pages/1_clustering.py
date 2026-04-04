@@ -65,7 +65,7 @@ if "K-Means" in algoritmo:
     fig_codo = generar_grafica_codo(datos_escalados)
     st.plotly_chart(fig_codo, width='stretch')
 else:
-    st.info("💡 **Nota sobre el Dendrograma:** Para evitar que tu navegador colapse, esta gráfica muestra una muestra representativa de 1,000 registros. Las agrupaciones principales (colores) son precisas, aunque la forma exacta de las ramas varíe.")
+    st.info("**Nota sobre el Dendrograma:** Para evitar que tu navegador colapse, esta gráfica muestra una muestra representativa de 100 registros. Las agrupaciones principales (colores) son precisas, aunque la forma exacta de las ramas varíe.")
     fig_dendro = generar_dendrograma(datos_escalados)
     st.plotly_chart(fig_dendro, width='stretch')
 
