@@ -5,70 +5,7 @@ from pandas.api.types import is_numeric_dtype
 from modules.cleaning import detectar_outliers, detectar_webones, codificar_categoricos_inteligente, estandarizar_zscore
 from modules.cleaning_motor import aplicar_estructural, aplicar_outliers, aplicar_webones, aplicar_nulos
 from modules.dataset_profiler import analizar_dataframe
-
-def renderizar_df_paginado(
-    df,
-    pintar_func=None,
-    style_mode="apply",   # "apply" o "map"
-    formatter=None,
-    height=300,
-    page_size=200,
-    key="tabla"
-):
-
-    total_filas = len(df)
-    total_paginas = max(1, (total_filas - 1) // page_size + 1)
-
-    col1, col2 = st.columns([1,4])
-
-    with col1:
-        pagina = st.number_input(
-            "Página",
-            min_value=1,
-            max_value=total_paginas,
-            value=1,
-            key=f"{key}_pagina"
-        )
-
-    with col2:
-        st.caption(f"Mostrando filas {(pagina-1)*page_size+1} - {min(pagina*page_size,total_filas)} de {total_filas}")
-
-    start = (pagina-1) * page_size
-    end = start + page_size
-
-    df_page = df.iloc[start:end]
-
-    # aplicar estilos
-    if pintar_func:
-
-        styler = df_page.style
-
-        if style_mode == "apply":
-            styler = styler.apply(pintar_func, axis=None)
-
-        elif style_mode == "map":
-            metodo_map = getattr(styler, "map", getattr(styler, "applymap", None))
-            styler = metodo_map(pintar_func)
-
-        if formatter:
-            styler = styler.format(formatter=formatter, na_rep="NaN")
-
-        st.dataframe(
-            styler,
-            height=height,
-            width="stretch"
-        )
-
-    else:
-
-        if formatter:
-            df_page = df_page.style.format(formatter=formatter, na_rep="NaN")
-
-        st.dataframe(
-            df_page,
-            height=height,
-            width="stretch"
-        )
+from modules.renderers import renderizar_df_paginado
 
 # =======================================================
 # 🖥️ LA INTERFAZ DE USUARIO (UI) - BRANDING DIA
@@ -88,7 +25,19 @@ st.divider()
 
 st.title("Limpieza de Datos")
 
-archivo_subido = st.file_uploader("Sube tu dataset sucio (CSV o Excel)", type=["csv", "xlsx"])
+def limpiar_memoria_analisis():
+    # Lista de todas las variables temporales que queremos aniquilar si hay archivo nuevo
+    claves_a_borrar = ['cluster_resultados', 'descriptivo_resultados'] # Agrega aquí otras si necesitas
+    
+    for clave in claves_a_borrar:
+        if clave in st.session_state:
+            del st.session_state[clave]
+
+archivo_subido = st.file_uploader(
+    "Sube tu dataset sucio (CSV o Excel)", 
+    type=['csv', 'xlsx'],
+    on_change=limpiar_memoria_analisis  # <-- ¡EL TRUCO ESTÁ AQUÍ!
+)
 
 if archivo_subido is not None:
     try:
@@ -564,12 +513,12 @@ if 'df_original' in st.session_state:
             data=csv,
             file_name="dataset_al_ready_cora.csv",
             mime="text/csv",
-            use_container_width=True
+            width='stretch'
         )
 
     # --- BOTÓN 2: MANDAR A PRODUCCIÓN Y CLONAR ---
     with col2:
-        if st.button("✅ Confirmar y Mandar a Análisis", type="primary", use_container_width=True):
+        if st.button("✅ Confirmar y Mandar a Análisis", type="primary", width='stretch'):
             
             # 1. Guardar "El Chido" (Limpio, tal cual lo ve el usuario)
             st.session_state['df_chido'] = df_imputado.copy()
