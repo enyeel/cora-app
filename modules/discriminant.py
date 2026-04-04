@@ -63,8 +63,8 @@ def box_m_test(X, y):
         "chi2": chi2_stat,
         "p_valor": p_value,
         "interpretacion": "⚠️ Se rechaza H0 (matrices diferentes) - considerar QDA" 
-                         if p_value < 0.05 
-                         else "✅ No se rechaza H0 (matrices homogéneas) - válido para LDA"
+                        if p_value < 0.05 
+                        else "✅ No se rechaza H0 (matrices homogéneas) - válido para LDA"
     }
 
 def mostrar_interfaz_analisis_discriminante(df):
@@ -131,7 +131,7 @@ def mostrar_interfaz_analisis_discriminante(df):
         variables_predictoras = columnas_numericas
         st.info(f"✅ Se usarán todas las {len(variables_predictoras)} variables numéricas.")
         st.write("**Variables incluidas:**", ", ".join(variables_predictoras[:10]) + 
-                 ("..." if len(variables_predictoras) > 10 else ""))
+                ("..." if len(variables_predictoras) > 10 else ""))
     else:
         variables_predictoras = st.multiselect(
             "Variables independientes (numéricas):",
@@ -300,7 +300,7 @@ def ejecutar_analisis_discriminante(df, columna_objetivo, variables_predictoras)
             coeficientes = pd.DataFrame(lda.coef_, columns=variables_predictoras, 
                                         index=[f"Función {i+1}" for i in range(lda.coef_.shape[0])])
             constante = pd.DataFrame(lda.intercept_, columns=['Constante'], 
-                                     index=[f"Función {i+1}" for i in range(lda.intercept_.shape[0])])
+                                    index=[f"Función {i+1}" for i in range(lda.intercept_.shape[0])])
         
         tabla_funciones = pd.concat([constante, coeficientes], axis=1)
         
@@ -308,7 +308,7 @@ def ejecutar_analisis_discriminante(df, columna_objetivo, variables_predictoras)
         matriz_m = confusion_matrix(y, y_pred)
         clases = lda.classes_
         df_matriz = pd.DataFrame(matriz_m, index=[f"Real: {c}" for c in clases], 
-                                 columns=[f"Predicho: {c}" for c in clases])
+                                columns=[f"Predicho: {c}" for c in clases])
         
         precision = accuracy_score(y, y_pred)
         
@@ -371,15 +371,15 @@ def ejecutar_analisis_discriminante(df, columna_objetivo, variables_predictoras)
         
         fig_precision = go.Figure(data=[
             go.Bar(x=precision_grupos['Grupo'], y=precision_grupos['Precisión (%)'],
-                   marker_color=colores[:len(precision_grupos)],
-                   text=precision_grupos['Precisión (%)'], textposition='auto')
+                marker_color=colores[:len(precision_grupos)],
+                text=precision_grupos['Precisión (%)'], textposition='auto')
         ])
         fig_precision.update_layout(title="Precisión de Clasificación por Grupo", height=400, width=600)
         figuras.append(("Precisión por Grupo", fig_precision))
         
         # Matriz de confusión
         fig_cm = go.Figure(data=go.Heatmap(z=matriz_m, x=[str(c) for c in clases], y=[str(c) for c in clases],
-                                           text=matriz_m, texttemplate="%{text}", colorscale='Blues'))
+                                        text=matriz_m, texttemplate="%{text}", colorscale='Blues'))
         fig_cm.update_layout(title="Matriz de Confusión", height=500, width=600)
         figuras.append(("Matriz de Confusión", fig_cm))
         
@@ -394,8 +394,8 @@ def ejecutar_analisis_discriminante(df, columna_objetivo, variables_predictoras)
                 for i, grupo in enumerate(clases):
                     datos_grupo = df_clean[df_clean[columna_objetivo] == grupo][var].dropna()
                     fig_box.add_trace(go.Box(y=datos_grupo, name=str(grupo), 
-                                             marker_color=colores[i % len(colores)],
-                                             showlegend=(idx == 0)), row=1, col=idx+1)
+                                            marker_color=colores[i % len(colores)],
+                                            showlegend=(idx == 0)), row=1, col=idx+1)
             fig_box.update_layout(title="Variables Más Discriminantes", height=500, width=800)
             figuras.append(("Variables Discriminantes", fig_box))
         
