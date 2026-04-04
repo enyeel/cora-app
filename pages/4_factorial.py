@@ -1,0 +1,168 @@
+# 4_Factorial.py
+import streamlit as st
+import pandas as pd
+import numpy as np
+from factor_analyzer import FactorAnalyzer
+from factor_analyzer.factor_analyzer import calculate_kmo, calculate_bartlett_sphericity
+
+# Importamos las funciones limpias de tu compa
+from modules.factorial import (
+    limpiar_datos, 
+    eliminar_multicolinealidad, 
+    normalizar, 
+    generar_scree_plot, 
+    heatmap_cargas, 
+    generar_diagrama_plotly
+)
+
+st.set_page_config(page_title="Análisis Factorial", page_icon="📊", layout="wide")
+
+st.title("📊 Análisis Factorial Exploratorio (AFE)")
+st.markdown("Descubre las variables ocultas (factores) que explican el comportamiento de tus datos.")
+
+# ==========================================
+# 0. VALIDACIÓN DE DATOS EN MEMORIA
+# ==========================================
+if 'df_original' not in st.session_state or st.session_state['df_original'] is None:
+    st.warning("⚠️ No hay datos cargados. Por favor, ve a la sección de 'Carga de Datos' primero.")
+    st.stop()
+
+# ==========================================
+# 1. PREPARACIÓN DE DATOS CON MANEJO DE ERRORES
+# ==========================================
+if 'df_fact_ready' not in st.session_state or len(st.session_state.get('df_fact_ready', [])) != len(st.session_state['df_original']):
+    with st.spinner("Preparando y limpiando datos numéricos..."):
+        try:
+            df_raw = st.session_state['df_original'].copy()
+            
+            # 1. Limpieza
+            df_limpio = limpiar_datos(df_raw)
+            
+            # 2. Multicolinealidad (Y guardamos el chisme de qué se borró)
+            df_sin_multi = eliminar_multicolinealidad(df_limpio)
+            borradas = set(df_limpio.columns) - set(df_sin_multi.columns)
+            st.session_state['fact_cols_borradas'] = borradas
+            
+            # 3. Normalización
+            df_listo = normalizar(df_sin_multi)
+            
+            # Si todo salió bien, guardamos en memoria y limpiamos errores viejos
+            st.session_state['df_fact_ready'] = df_listo
+            if 'fact_error' in st.session_state:
+                del st.session_state['fact_error']
+                
+        except ValueError as e:
+            # 🛑 PARCHE 1: Atrapamos el error de "No hay números" para que no explote
+            st.session_state['fact_error'] = str(e)
+
+# Si hubo un error en la limpieza, mostramos alerta y detenemos la app
+if 'fact_error' in st.session_state:
+    st.error(f"🚨 No se pudo procesar el Análisis Factorial: {st.session_state['fact_error']}")
+    st.info("💡 Consejo: Sube un archivo que contenga al menos 2 columnas con valores numéricos.")
+    st.stop()
+
+df = st.session_state['df_fact_ready']
+
+# 🛑 PARCHE 2: Mostramos visualmente si alguna columna fue asesinada por multicolinealidad
+if st.session_state.get('fact_cols_borradas'):
+    st.warning(f"⚠️ Se ignoraron estas variables por tener correlación casi perfecta (>0.95) con otras: **{', '.join(st.session_state['fact_cols_borradas'])}**")
+
+# ==========================================
+# 2. PRUEBAS DE VIABILIDAD (KMO y Bartlett)
+# ==========================================
+st.header("1. Diagnóstico de Viabilidad")
+
+kmo_all, kmo_model = calculate_kmo(df)
+chi2, p_value = calculate_bartlett_sphericity(df)
+
+col1, col2 = st.columns(2)
+with col1:
+    st.metric(label="Índice KMO", value=f"{kmo_model:.3f}", 
+              help="Mayor a 0.6 es aceptable. Mayor a 0.8 es excelente.")
+with col2:
+    st.metric(label="Prueba de Bartlett (p-value)", value=f"{p_value:.5f}", 
+              help="Debe ser menor a 0.05 para que el análisis sea válido.")
+
+if kmo_model < 0.6:
+    st.warning("⚠️ El KMO es bajo. Tus datos podrían no ser los mejores para un Análisis Factorial, pero puedes continuar bajo tu propio riesgo.")
+else:
+    st.success("✅ Los datos son viables para el análisis.")
+
+st.divider()
+
+# ==========================================
+# 3. SCREE PLOT Y CONFIGURACIÓN
+# ==========================================
+st.header("2. Selección de Factores")
+
+col_plot, col_conf = st.columns([2, 1])
+
+with col_plot:
+    fig_scree, eigenvalues = generar_scree_plot(df)
+    st.plotly_chart(fig_scree, use_container_width=True)
+
+with col_conf:
+    st.markdown("### Configuración")
+    modo = st.radio("Método de selección:", ["🤖 Automático (Kaiser)", "✋ Manual"])
+    
+    if modo == "🤖 Automático (Kaiser)":
+        n_factores = max(sum(eigenvalues > 1), 1)
+        st.info(f"El modelo sugiere **{n_factores} factores** basándose en la regla de Kaiser.")
+    else:
+        max_val = max(1, len(df.columns) // 2)
+        default_val = min(2, max_val)
+        n_factores = st.number_input(
+            "Número de Factores:", 
+            min_value=1, 
+            max_value=max_val, 
+            value=default_val
+        )
+
+    ejecutar = st.button("🚀 Ejecutar Análisis", type="primary", use_container_width=True)
+
+st.divider()
+
+# ==========================================
+# 4. RESULTADOS DEL MODELO
+# ==========================================
+if ejecutar:
+    with st.spinner("Calculando cargas factoriales..."):
+        fa = FactorAnalyzer(n_factors=n_factores, rotation='varimax', method='minres')
+        fa.fit(df)
+        
+        cargas = pd.DataFrame(fa.loadings_, index=df.columns)
+        cargas.columns = [f"Factor {i+1}" for i in range(n_factores)]
+        
+        st.header("3. Interpretación de Factores")
+        
+        tab1, tab2 = st.tabs(["Mapa de Calor (Cargas)", "Diagrama de Barras"])
+        
+        with tab1:
+            fig_heat = heatmap_cargas(cargas)
+            st.plotly_chart(fig_heat, use_container_width=True)
+            
+        with tab2:
+            fig_bar = generar_diagrama_plotly(cargas)
+            st.plotly_chart(fig_bar, use_container_width=True)
+            
+        # ==========================================
+        # 5. EXPORTACIÓN BLINDADA
+        # ==========================================
+        st.subheader("Datos Transformados")
+        
+        # 🛑 PARCHE 3: Le agregamos index=df.index para que no se pierda la alineación
+        factores_df = pd.DataFrame(fa.transform(df), columns=cargas.columns, index=df.index)
+        
+        df_export = st.session_state['df_original'].copy()
+        for col in factores_df.columns:
+            # Quitamos el .values para que Pandas respete los índices originales al pegar
+            df_export[col] = factores_df[col]
+            
+        st.dataframe(df_export.head(50), use_container_width=True)
+        
+        st.download_button(
+            label="⬇️ Descargar Datos con Factores Integrados",
+            data=df_export.to_csv(index=False).encode('utf-8'),
+            file_name="dataset_factorial.csv",
+            mime="text/csv"
+        )
