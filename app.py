@@ -5,7 +5,7 @@ import pandas as pd
 # Por ahora las dejo comentadas para que no te marque error.
 # from modules.descriptiva import calcular_descriptiva
 # from modules.factorial import hacer_factorial
-from modules.discriminante import hacer_discriminante
+# from modules.discriminante import hacer_discriminante  # Quitado: no se usa y está mal escrito
 # from modules.conglomerados import hacer_conglomerados
 
 # --- CONFIGURACIÓN DE LA PÁGINA ---
