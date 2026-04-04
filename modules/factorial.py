@@ -70,7 +70,7 @@ def generar_scree_plot(df):
         template='plotly_dark'
     )
 
-    return fig.to_json(), eigenvalues
+    return fig, eigenvalues
 
 
 # -------------------------------
@@ -101,7 +101,7 @@ def generar_diagrama_plotly(cargas, umbral=0.4):
         showlegend=False
     )
 
-    return fig.to_json()
+    return fig
 
 
 # -------------------------------
@@ -116,7 +116,7 @@ def heatmap_cargas(cargas):
         template="plotly_dark"
     )
 
-    return fig.to_json()
+    return fig
 
 
 # -------------------------------
