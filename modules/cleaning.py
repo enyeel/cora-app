@@ -1,10 +1,44 @@
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import StandardScaler
+from pandas.api.types import is_numeric_dtype
 
 # ==========================================
 # 🩻 MÓDULO DE DETECCIÓN (RAYOS X)
 # ==========================================
+
+def detectar_anomalias_estructurales(df):
+    """
+    Escanea el DataFrame en busca de columnas 100% vacías, columnas zombie (>60% nulos)
+    y columnas que deberían ser numéricas pero tienen textos escondidos (coerción).
+    """
+    reporte = {
+        "vacias": [],
+        "zombies": [],
+        "coercion": {}
+    }
+    
+    for col in df.columns:
+        pct_nulos = df[col].isnull().mean()
+        
+        # Detectar vacías y zombies
+        if pct_nulos == 1.0:
+            reporte["vacias"].append(col)
+        elif pct_nulos >= 0.60:
+            reporte["zombies"].append(col)
+
+        # Detectar coerción
+        if not is_numeric_dtype(df[col]):
+            s_orig = df[col]
+            s_num = pd.to_numeric(s_orig, errors='coerce')
+            mask_rebeldes = s_orig.notna() & s_num.isna()
+            
+            if s_num.notna().any():
+                tasa_exito = s_num.notna().sum() / s_orig.notna().sum()
+                if tasa_exito > 0.50 and mask_rebeldes.any():
+                    reporte["coercion"][col] = df.loc[mask_rebeldes, [col]]
+                    
+    return reporte
 
 def detectar_outliers(df):
     """Busca outliers numéricos. Devuelve un mapa de celdas atípicas y las columnas afectadas."""
