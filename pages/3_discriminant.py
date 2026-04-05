@@ -1,4 +1,6 @@
 import streamlit as st
+import pandas as pd
+import numpy as np
 from modules.discriminant import ejecutar_analisis_discriminante
 
 st.set_page_config(page_title="Análisis Discriminante", page_icon="🎯", layout="wide")
@@ -6,23 +8,35 @@ st.set_page_config(page_title="Análisis Discriminante", page_icon="🎯", layou
 st.title("🎯 Análisis Discriminante")
 
 # Verificar si hay datos limpios
-if 'df_limpio' not in st.session_state or st.session_state.df_limpio is None:
+if 'df_chido' not in st.session_state or st.session_state.df_chido is None:
     st.warning("⚠️ Primero carga y limpia los datos en la página principal.")
     st.stop()
 
-df = st.session_state.df_limpio
+df = st.session_state.df_chido
 
-st.subheader("🎯 Análisis Discriminante")
-st.markdown("---")
+# 🔥 WRAPPER PARA CACHEAR LA FUNCIÓN DIOS 🔥
+# Esto guarda el resultado en memoria. Si metes los mismos datos, carga al instante.
+@st.cache_data(show_spinner=False)
+def ejecutar_analisis_cache(dataframe, objetivo, predictoras):
+    return ejecutar_analisis_discriminante(dataframe, objetivo, predictoras)
 
 # --- PASO 1: SELECCIONAR VARIABLE OBJETIVO ---
 st.subheader("📌 Paso 1: Selecciona la variable a predecir (objetivo)")
 
-columnas_categoricas = df.select_dtypes(include=['object', 'category']).columns.tolist()
+def obtener_variables_objetivo_validas(dataframe):
+    validas = []
+    for col in dataframe.columns:
+        nunique = dataframe[col].nunique()
+        if 1 < nunique <= 20:
+            if dataframe[col].value_counts().min() >= 2:
+                validas.append(col)
+    return validas
+
+columnas_categoricas = obtener_variables_objetivo_validas(df)
 
 if len(columnas_categoricas) == 0:
-    st.warning("⚠️ No se encontraron variables categóricas para usar como variable dependiente.")
-    st.info("El análisis discriminante requiere una variable objetivo categórica (ejemplo: 'género', 'compra', 'segmento')")
+    st.warning("⚠️ No se encontraron variables válidas para usar como objetivo.")
+    st.info("Requisitos: Entre 2 y 20 categorías, y al menos 2 datos por categoría.")
     st.stop()
 
 columna_objetivo = st.selectbox(
@@ -39,51 +53,57 @@ if columna_objetivo:
     with col1:
         st.dataframe(distribucion.reset_index().rename(
             columns={'index': 'Grupo', columna_objetivo: 'Frecuencia'}
-        ), use_container_width=True)
+        ), width='stretch')
     with col2:
         st.write(f"**Variable:** `{columna_objetivo}`")
         st.write(f"**Tipo:** {df[columna_objetivo].dtype}")
 
 st.markdown("---")
 
-# --- PASO 2: SELECCIONAR VARIABLES PREDICTORAS ---
+# --- PASO 2: SELECCIONA LAS VARIABLES PREDICTORAS ---
 st.subheader("📊 Paso 2: Selecciona las variables predictoras")
 
-columnas_numericas = df.select_dtypes(include=[float, int]).columns.tolist()
+# 🔥 FILTRO INTELIGENTE USANDO LOS METADATOS 🔥
+metadata = st.session_state.get('metadata', {})
 
-if len(columnas_numericas) == 0:
-    st.warning("⚠️ No hay variables numéricas para usar como predictoras.")
-    st.stop()
+# Filtramos usando el perfilador: solo numericos y que NO sean la variable objetivo
+columnas_numericas_validas = [
+    col for col in df.columns
+    if col in metadata 
+    and metadata[col]["tipo"] in ["numerico_continuo", "numerico_discreto"]
+    and col != columna_objetivo
+]
 
+# Fallback de seguridad (por si el metadata no está cargado por alguna razón)
+if not columnas_numericas_validas:
+    columnas_numericas_validas = [
+        col for col in df.select_dtypes(include=['number']).columns 
+        if col != columna_objetivo and not col.lower().startswith("id")
+    ]
+
+# UI para seleccionar el modo
 modo_seleccion = st.radio(
     "Modo de selección:",
-    ["Usar todas las variables numéricas", "Seleccionar manualmente"],
-    horizontal=True,
-    key="disc_modo"
+    options=["Usar todas las variables numéricas válidas", "Seleccionar manualmente"],
+    horizontal=True
 )
 
-if modo_seleccion == "Usar todas las variables numéricas":
-    variables_predictoras = columnas_numericas
-    st.info(f"✅ Se usarán todas las {len(variables_predictoras)} variables numéricas.")
-    st.write("**Variables incluidas:**", ", ".join(variables_predictoras[:10]) + 
-            ("..." if len(variables_predictoras) > 10 else ""))
+if modo_seleccion == "Usar todas las variables numéricas válidas":
+    variables_predictoras = columnas_numericas_validas
+    st.info(f"✅ Se usarán {len(variables_predictoras)} variables predictoras automáticamente (se excluyeron IDs y variables categóricas).")
+    st.write(f"**Variables incluidas:** {', '.join(variables_predictoras)}")
 else:
     variables_predictoras = st.multiselect(
-        "Variables independientes (numéricas):",
-        columnas_numericas,
-        default=columnas_numericas[:min(5, len(columnas_numericas))],
-        key="disc_predictoras"
+        "Selecciona las variables predictoras:",
+        options=columnas_numericas_validas,
+        default=columnas_numericas_validas,
+        help="Elige las variables continuas o discretas que ayudarán a clasificar los grupos."
     )
     
-    if not variables_predictoras:
-        st.warning("⚠️ Selecciona al menos una variable predictora.")
-        st.stop()
-    else:
-        st.success(f"✅ Seleccionadas {len(variables_predictoras)} variables predictoras.")
+    if len(variables_predictoras) < 2:
+        st.warning("⚠️ Se recomienda seleccionar al menos 2 variables predictoras para un análisis discriminante óptimo.")
 
-st.markdown("---")
-
-# --- PASO 3: EJECUTAR ANÁLISIS ---
+# --- PASO 3: EJECUTAR ANÁLISIS Y GESTIONAR SESSION STATE ---
 st.subheader("🚀 Paso 3: Ejecutar Análisis")
 
 with st.expander("📋 Resumen de configuración"):
@@ -91,15 +111,47 @@ with st.expander("📋 Resumen de configuración"):
     st.write(f"**Variables predictoras:** {len(variables_predictoras)}")
     st.write(f"**Grupos a clasificar:** {df[columna_objetivo].nunique()}")
     st.write(f"**Total de casos:** {len(df)}")
-    st.write(f"**Casos sin valores nulos:** {len(df[variables_predictoras + [columna_objetivo]].dropna())}")
+    st.write(f"**Casos sin nulos:** {len(df[variables_predictoras + [columna_objetivo]].dropna())}")
 
+# DETECTOR DE CAMBIOS (STATE SIGNATURE)
+# Ahora escuchamos al sello oficial de app.py, no a los switches en tiempo real
+sello_oficial = st.session_state.get('sello_datos_confirmados', 'sin_sello')
+
+# Nuestra Súper Huella junta: El Sello de Confirmación + Variable Objetivo + Predictoras elegidas
+huella_actual = f"{sello_oficial}_{columna_objetivo}_{str(variables_predictoras)}"
+
+if "disc_huella_df" not in st.session_state:
+    st.session_state.disc_huella_df = huella_actual
+
+# Si la huella actual no coincide con la guardada, algo cambió en el universo
+if st.session_state.disc_huella_df != huella_actual:
+    # Limpiamos los resultados obsoletos
+    if "disc_resultados" in st.session_state:
+        del st.session_state["disc_resultados"]
+    # Actualizamos la memoria con la nueva huella
+    st.session_state.disc_huella_df = huella_actual
+
+# Inicializamos la variable de resultados si no existe
+if "disc_resultados" not in st.session_state:
+    st.session_state.disc_resultados = None
+
+# EL BOTÓN SOLO CALCULA Y GUARDA EN SESSION STATE
 if st.button("🔍 Ejecutar Análisis Discriminante", type="primary", key="disc_ejecutar"):
-    with st.spinner("Procesando análisis discriminante..."):
-        resultados = ejecutar_analisis_discriminante(
+    with st.spinner("Procesando análisis discriminante (puede tardar un momento)..."):
+        # Llamamos a la función
+        resultados = ejecutar_analisis_cache(
             df, 
             columna_objetivo, 
             variables_predictoras
         )
+        # Guardamos en session_state para que sobreviva a cambios de página
+        st.session_state.disc_resultados = resultados
+
+
+# 🔥 LA RENDERIZACIÓN SE HACE SI HAY RESULTADOS GUARDADOS 🔥
+# Ya no está anidado dentro del 'if st.button:', así que se dibuja aunque vengas de otra pestaña
+if st.session_state.disc_resultados is not None:
+    resultados = st.session_state.disc_resultados
     
     if "error" in resultados:
         st.error(resultados["error"])
@@ -107,10 +159,8 @@ if st.button("🔍 Ejecutar Análisis Discriminante", type="primary", key="disc_
         st.success("✅ Análisis completado con éxito")
         st.markdown("---")
         
-        # Mostrar resultados en formato organizado
         st.subheader("📊 Resultados del Análisis")
         
-        # Resumen en columnas
         col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Precisión Global", resultados["resumen"]["Precisión Global"])
@@ -121,19 +171,28 @@ if st.button("🔍 Ejecutar Análisis Discriminante", type="primary", key="disc_
         with col4:
             st.metric("Mal Clasificados", resultados["resumen"]["Casos Mal Clasificados"])
         
-        # Funciones Discriminantes
-        with st.expander("📈 Funciones Discriminantes", expanded=True):
-            st.dataframe(resultados["funciones_discriminantes"], use_container_width=True)
+        # Convertimos la lista de tuplas en un diccionario para acceder fácil
+        figuras_dict = dict(resultados["figuras"])
         
-        # Centroides
+        with st.expander("📈 Funciones Discriminantes"):
+            st.dataframe(resultados["funciones_discriminantes"], width='stretch')
+            if "Funciones Discriminantes" in figuras_dict:
+                st.plotly_chart(figuras_dict["Funciones Discriminantes"], width='stretch')
+        
+        if "Variables Discriminantes" in figuras_dict:
+            with st.expander("📦 Variables Más Discriminantes"):
+                st.plotly_chart(figuras_dict["Variables Discriminantes"], width='stretch')
+
         with st.expander("🎯 Centroides de Grupos"):
-            st.dataframe(resultados["centroides"], use_container_width=True)
+            st.dataframe(resultados["centroides"], width='stretch')
+            if "Perfil de Centroides" in figuras_dict:
+                st.plotly_chart(figuras_dict["Perfil de Centroides"], width='stretch')
         
-        # Matriz de Confusión
         with st.expander("📊 Matriz de Confusión"):
-            st.dataframe(resultados["matriz_confusion"], use_container_width=True)
+            st.dataframe(resultados["matriz_confusion"], width='stretch')
+            if "Matriz de Confusión" in figuras_dict:
+                st.plotly_chart(figuras_dict["Matriz de Confusión"], width='stretch')
         
-        # Test de Box M
         with st.expander("🔬 Test de Box M (Homogeneidad de Covarianzas)"):
             box_m = resultados["test_box_m"]
             col1, col2 = st.columns(2)
@@ -145,20 +204,16 @@ if st.button("🔍 Ejecutar Análisis Discriminante", type="primary", key="disc_
                 st.write(f"**Valor p:** {box_m['p_valor']:.6f}" if not pd.isna(box_m['p_valor']) else "**Valor p:** No disponible")
             st.write(f"**Interpretación:** {box_m['interpretacion']}")
         
-        # Clasificación por grupo
         with st.expander("📊 Clasificación por Grupo"):
             df_clasificacion = pd.DataFrame(resultados["clasificacion_por_grupo"]).T
-            st.dataframe(df_clasificacion, use_container_width=True)
+            st.dataframe(df_clasificacion, width='stretch')
+            if "Precisión por Grupo" in figuras_dict:
+                st.plotly_chart(figuras_dict["Precisión por Grupo"], width='stretch')
         
-        # Casos mal clasificados
         if len(resultados["casos_mal_clasificados"]) > 0:
             with st.expander("⚠️ Casos Mal Clasificados"):
-                st.dataframe(resultados["casos_mal_clasificados"], use_container_width=True)
+                st.dataframe(resultados["casos_mal_clasificados"], width='stretch')
         else:
             st.success("✅ ¡Todos los casos fueron clasificados correctamente!")
         
-        # Gráficos
-        st.subheader("📈 Visualización de Resultados")
-        for titulo, fig in resultados["figuras"]:
-            st.plotly_chart(fig, use_container_width=True)
-            st.markdown("---")
+        st.markdown("---")
