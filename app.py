@@ -36,18 +36,19 @@ def inicializar_sesion(df_raw, nombre_archivo):
 # =======================================================
 st.set_page_config(page_title="CEXO | by DIA", page_icon="☀️", layout="wide")
 
-with st.sidebar:
-    st.markdown("## CEXO by ☀️ DIA")
-    st.caption("**Data Intelligence & Analytics**")
-    st.caption("📍 *Software desarrollado en el Bajío Valley*")
-    st.divider()
-    st.caption("© 2026 DIA. Todos los derechos reservados a los 11 fundadores (CDIA).")
+# --- CONFIGURACIÓN DE LA PÁGINA ---
+st.set_page_config(page_title="Software de Estadística", page_icon="📊", layout="wide")
 
-st.title("CEXO Analysis")
-st.markdown("*Powered by **DIA** - Algoritmos de vanguardia para datos impecables.*")
-st.divider()
+# --- FUNCIÓN DE LIMPIEZA (Tu otra chamba) ---
+def limpiar_datos(df):
+    # Aquí meterás tu lógica: quitar nulos, cambiar tipos de datos, etc.
+    # Por ahora, solo regresamos el mismo dataframe.
+    df_limpio = df.dropna() 
+    return df_limpio
 
-st.title("Limpieza de Datos")
+# --- EL MENÚSITO OBVIS (Barra Lateral) ---
+st.sidebar.title("⚙️ Menú de Opciones")
+st.sidebar.markdown("---")
 
 archivo_subido = st.file_uploader(
     "Sube tu dataset sucio (CSV o Excel)", 
@@ -377,6 +378,7 @@ if 'df_original' in st.session_state:
             try: renderizar_df_paginado(st.session_state.get('df_scaled'), height=300, key="result_scaled")
             except Exception: st.dataframe(st.session_state.get('df_scaled'))
 
+# --- MÓDULOS DE TUS COMPAS ---
 else:
     st.info("👆 Sube un dataset para comenzar el proceso de limpieza.")
     st.stop()
