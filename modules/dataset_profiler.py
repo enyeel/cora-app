@@ -3,7 +3,6 @@ import numpy as np
 
 
 def analizar_dataframe(df):
-
     info = {}
 
     for col in df.columns:
