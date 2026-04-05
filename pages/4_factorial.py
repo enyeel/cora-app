@@ -21,38 +21,37 @@ st.title("📊 Análisis Factorial Exploratorio (AFE)")
 st.markdown("Descubre las variables ocultas (factores) que explican el comportamiento de tus datos.")
 
 # ==========================================
-# 0. VALIDACIÓN DE DATOS EN MEMORIA
+# 1. PREPARACIÓN DE DATOS CON MANEJO DE ESTADO
 # ==========================================
-if 'df_original' not in st.session_state or st.session_state['df_original'] is None:
-    st.warning("⚠️ No hay datos cargados. Por favor, ve a la sección de 'Carga de Datos' primero.")
-    st.stop()
+if 'df_encoded' not in st.session_state or st.session_state['df_encoded'] is None:
+    st.warning("⚠️ ¡Papi, espérate! No hay datos confirmados en memoria. Ve a la página principal, limpia tu dataset y dale al botón de 'Confirmar y Mandar a Análisis'.")
+    st.stop() # 👈 Esto detiene la ejecución aquí mismo, evitando el crash.
 
-# ==========================================
-# 1. PREPARACIÓN DE DATOS CON MANEJO DE ERRORES
-# ==========================================
-if 'df_fact_ready' not in st.session_state or len(st.session_state.get('df_fact_ready', [])) != len(st.session_state['df_original']):
+df_base = st.session_state.get('df_encoded', None) 
+
+sello_oficial = st.session_state.get('sello_datos_confirmados', 'sin_sello')
+huella_fact = f"{sello_oficial}"
+
+# Solo recalculamos la preparación si la huella cambió
+if st.session_state.get('fact_huella_prep') != huella_fact:
     with st.spinner("Preparando y limpiando datos numéricos..."):
         try:
-            df_raw = st.session_state['df_original'].copy()
-            
-            # 1. Limpieza
+            df_raw = df_base.copy()
             df_limpio = limpiar_datos(df_raw)
-            
-            # 2. Multicolinealidad (Y guardamos el chisme de qué se borró)
             df_sin_multi = eliminar_multicolinealidad(df_limpio)
+            
             borradas = set(df_limpio.columns) - set(df_sin_multi.columns)
             st.session_state['fact_cols_borradas'] = borradas
             
-            # 3. Normalización
             df_listo = normalizar(df_sin_multi)
             
-            # Si todo salió bien, guardamos en memoria y limpiamos errores viejos
             st.session_state['df_fact_ready'] = df_listo
+            st.session_state['fact_huella_prep'] = huella_fact # Guardamos la huella actual
+            
             if 'fact_error' in st.session_state:
                 del st.session_state['fact_error']
                 
         except ValueError as e:
-            # 🛑 PARCHE 1: Atrapamos el error de "No hay números" para que no explote
             st.session_state['fact_error'] = str(e)
 
 # Si hubo un error en la limpieza, mostramos alerta y detenemos la app

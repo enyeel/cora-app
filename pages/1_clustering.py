@@ -100,6 +100,16 @@ with col_btn:
                 'score': score
             }
 
+# DETECTOR DE CAMBIOS (STATE SIGNATURE) PARA CLUSTERING
+sello_oficial = st.session_state.get('sello_datos_confirmados', 'sin_sello')
+# La huella depende de los datos, el algoritmo, las variables y el K elegido
+huella_cluster = f"{sello_oficial}_{algoritmo}_{str(cols_seleccionadas)}_{k_elegido}"
+
+if st.session_state.get("cluster_huella") != huella_cluster:
+    if 'cluster_resultados' in st.session_state:
+        del st.session_state['cluster_resultados'] # Matamos al fantasma
+    st.session_state.cluster_huella = huella_cluster
+
 # 6. SECCIÓN D: RESULTADOS (Solo se muestra si hay algo guardado en memoria)
 if 'cluster_resultados' in st.session_state:
     st.divider()
