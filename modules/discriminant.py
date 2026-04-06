@@ -221,7 +221,7 @@ def ejecutar_analisis_discriminante(df, columna_objetivo, variables_predictoras)
                         
                     fig_box.add_trace(go.Box(y=datos_grupo, name=str(grupo), 
                                             marker_color=colores[i % len(colores)],
-                                            boxpoints=False, # 🔥 MAGIA: False en vez de 'outliers'. No dibuja ni un solo punto.
+                                            boxpoints=False, #  MAGIA: False en vez de 'outliers'. No dibuja ni un solo punto.
                                             showlegend=(idx == 0)), row=1, col=idx+1)
                                             
             fig_box.update_layout(title="Variables Más Discriminantes (Sin Outliers Visuales)", height=500, width=800)
@@ -233,7 +233,7 @@ def ejecutar_analisis_discriminante(df, columna_objetivo, variables_predictoras)
             df_scores = pd.DataFrame(scores, columns=[f'DF{i+1}' for i in range(scores.shape[1])])
             df_scores['Grupo'] = y
             
-            # 🔥 EL TRUCO DEL MUESTREO PARA SALVAR EL RENDIMIENTO 🔥
+            #  EL TRUCO DEL MUESTREO PARA SALVAR EL RENDIMIENTO 
             LIMITE_PUNTOS = 1500 # Máximo de puntos a dibujar en total (ajusta a tu gusto)
             
             if len(df_scores) > LIMITE_PUNTOS:

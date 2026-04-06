@@ -14,7 +14,7 @@ if 'df_chido' not in st.session_state or st.session_state.df_chido is None:
 
 df = st.session_state.df_chido
 
-# 🔥 WRAPPER PARA CACHEAR LA FUNCIÓN DIOS 🔥
+#  WRAPPER PARA CACHEAR LA FUNCIÓN DIOS 
 # Esto guarda el resultado en memoria. Si metes los mismos datos, carga al instante.
 @st.cache_data(show_spinner=False)
 def ejecutar_analisis_cache(dataframe, objetivo, predictoras):
@@ -63,7 +63,7 @@ st.markdown("---")
 # --- PASO 2: SELECCIONA LAS VARIABLES PREDICTORAS ---
 st.subheader("📊 Paso 2: Selecciona las variables predictoras")
 
-# 🔥 FILTRO INTELIGENTE USANDO LOS METADATOS 🔥
+#  FILTRO INTELIGENTE USANDO LOS METADATOS 
 metadata = st.session_state.get('metadata', {})
 
 # Filtramos usando el perfilador: solo numericos y que NO sean la variable objetivo
@@ -148,7 +148,7 @@ if st.button("🔍 Ejecutar Análisis Discriminante", type="primary", key="disc_
         st.session_state.disc_resultados = resultados
 
 
-# 🔥 LA RENDERIZACIÓN SE HACE SI HAY RESULTADOS GUARDADOS 🔥
+#  LA RENDERIZACIÓN SE HACE SI HAY RESULTADOS GUARDADOS 
 # Ya no está anidado dentro del 'if st.button:', así que se dibuja aunque vengas de otra pestaña
 if st.session_state.disc_resultados is not None:
     resultados = st.session_state.disc_resultados
