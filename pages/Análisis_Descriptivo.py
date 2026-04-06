@@ -9,10 +9,15 @@ from modules.descriptive import (
     scatter_plot, scatter_matrix, correlation_matrix, correlation_heatmap
 )
 
-st.set_page_config(page_title="Análisis Descriptivo | DIA", page_icon="📈", layout="wide")
+st.set_page_config(page_title="Análisis Descriptivo | DIA", page_icon=None, layout="wide")
 
-st.title("📈 Análisis Descriptivo y Exploratorio")
-st.markdown("Comprende a fondo la distribución, forma y correlación de tus variables.")
+from modules.layout import render_sidebar
+
+# Sidebar compartido
+render_sidebar()
+
+st.title("Análisis descriptivo y exploratorio")
+st.markdown("Comprenda la distribución, forma y correlación de sus variables.")
 
 # ==========================================
 # 1. EL CADENERO (VALIDACIÓN DE DATOS)
@@ -45,13 +50,13 @@ for col in df.columns:
 # ==========================================
 col1, col2, col3 = st.columns(3)
 with col1:
-    col_num = st.selectbox("🎯 Selecciona una columna Numérica:", options=[None] + columnas_numericas)
+    col_num = st.selectbox("Selecciona una columna numérica:", options=[None] + columnas_numericas)
 with col2:
-    col_cat = st.selectbox("🏷️ Selecciona una columna Categórica (Opcional):", options=[None] + columnas_categoricas)
+    col_cat = st.selectbox("Selecciona una columna categórica (opcional):", options=[None] + columnas_categoricas)
 with col3:
-    bins = st.slider("📏 Número de Intervalos (Bins) para histograma:", min_value=5, max_value=50, value=10)
+    bins = st.slider("Número de intervalos (bins) para histograma:", min_value=5, max_value=50, value=10)
 
-ejecutar = st.button("🚀 Ejecutar Análisis", type="primary", width='stretch')
+ejecutar = st.button("Ejecutar análisis", type="primary", width='stretch')
 st.divider()
 
 # ==========================================
@@ -110,7 +115,7 @@ if ejecutar and col_num is not None:
 if 'desc_resultados' in st.session_state:
     res = st.session_state['desc_resultados']
     
-    st.header(f"📊 Análisis de: `{col_num}`")
+    st.header(f"Análisis de: `{col_num}`")
     
     # 6.1 ESTADÍSTICAS BÁSICAS (TABS)
     tab1, tab2, tab3, tab4 = st.tabs(["Tendencia Central y Dispersión", "Forma y Posición", "Prueba de Normalidad", "Tabla de Frecuencias"])
@@ -133,7 +138,7 @@ if 'desc_resultados' in st.session_state:
         st.dataframe(res['freq_tbl'], width='stretch', hide_index=True)
         
     # 6.2 GRÁFICAS DE DISTRIBUCIÓN
-    st.subheader("📈 Distribución de los Datos")
+    st.subheader("Distribución de los datos")
     col_g1, col_g2 = st.columns(2)
     col_g1.plotly_chart(res['fig_hist'], width='stretch')
     col_g2.plotly_chart(res['fig_poly'], width='stretch')
@@ -144,14 +149,14 @@ if 'desc_resultados' in st.session_state:
     
     # 6.3 ANÁLISIS MULTIVARIABLE Y CORRELACIÓN
     st.divider()
-    st.header("🔗 Correlaciones Globales (Todas las variables numéricas)")
+    st.header("Correlaciones globales (todas las variables numéricas)")
     
     if res['fig_corr'] is not None:
-        with st.expander("Ver Matriz de Correlación (Heatmap)", expanded=True):
+        with st.expander("Ver matriz de correlación (heatmap)", expanded=True):
             st.plotly_chart(res['fig_corr'], width='stretch')
             
-        with st.expander("Ver Matriz de Dispersión (Pairplot)"):
-            st.warning("Renderizar esta gráfica puede tomar unos segundos si tienes muchas variables.")
+        with st.expander("Ver matriz de dispersión (pairplot)"):
+            st.warning("Renderizar esta gráfica puede tomar unos segundos si hay muchas variables.")
             if res.get('fig_matrix'):
                 st.plotly_chart(res['fig_matrix'], width='stretch')
     else:
@@ -160,10 +165,10 @@ if 'desc_resultados' in st.session_state:
     # 6.4 ANÁLISIS CATEGÓRICO
     if col_cat and 'cat_tbl' in res:
         st.divider()
-        st.header(f"🏷️ Análisis Categórico: `{col_cat}`")
+        st.header(f"Análisis categórico: `{col_cat}`")
         cc1, cc2 = st.columns([1, 2])
         cc1.dataframe(res['cat_tbl'], width='stretch', hide_index=True)
         cc2.plotly_chart(res['fig_cat_bar'], width='stretch')
 
 elif col_num is None:
-    st.info("👈 Selecciona una columna numérica y haz clic en 'Ejecutar Análisis' para comenzar.")
+    st.info("Seleccione una columna numérica y haga clic en 'Ejecutar análisis' para comenzar.")

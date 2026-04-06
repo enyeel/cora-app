@@ -1,4 +1,3 @@
-# 4_Factorial.py
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -15,16 +14,21 @@ from modules.factorial import (
     generar_diagrama_plotly
 )
 
-st.set_page_config(page_title="Análisis Factorial", page_icon="📊", layout="wide")
+from modules.layout import render_sidebar
 
-st.title("📊 Análisis Factorial Exploratorio (AFE)")
-st.markdown("Descubre las variables ocultas (factores) que explican el comportamiento de tus datos.")
+st.set_page_config(page_title="Análisis Factorial", page_icon=None, layout="wide")
+
+# Sidebar compartido
+render_sidebar()
+
+st.title("Análisis factorial exploratorio (AFE)")
+st.markdown("Descubra las variables latentes (factores) que explican el comportamiento de sus datos.")
 
 # ==========================================
 # 1. PREPARACIÓN DE DATOS CON MANEJO DE ESTADO
 # ==========================================
 if 'df_encoded' not in st.session_state or st.session_state['df_encoded'] is None:
-    st.warning("⚠️ ¡Papi, espérate! No hay datos confirmados en memoria. Ve a la página principal, limpia tu dataset y dale al botón de 'Confirmar y Mandar a Análisis'.")
+    st.warning("No hay datos confirmados en memoria. Vaya a la página principal, cargue y confirme su dataset para continuar.")
     st.stop() # 👈 Esto detiene la ejecución aquí mismo, evitando el crash.
 
 df_base = st.session_state.get('df_encoded', None) 
@@ -69,7 +73,7 @@ if st.session_state.get('fact_cols_borradas'):
 # ==========================================
 # 2. PRUEBAS DE VIABILIDAD (KMO y Bartlett)
 # ==========================================
-st.header("1. Diagnóstico de Viabilidad")
+st.header("Diagnóstico de viabilidad")
 
 kmo_all, kmo_model = calculate_kmo(df)
 chi2, p_value = calculate_bartlett_sphericity(df)
@@ -92,19 +96,19 @@ st.divider()
 # ==========================================
 # 3. SCREE PLOT Y CONFIGURACIÓN
 # ==========================================
-st.header("2. Selección de Factores")
+st.header("Selección de factores")
 
 col_plot, col_conf = st.columns([2, 1])
 
 with col_plot:
     fig_scree, eigenvalues = generar_scree_plot(df)
-    st.plotly_chart(fig_scree, use_container_width=True)
+    st.plotly_chart(fig_scree, width='stretch')
 
 with col_conf:
     st.markdown("### Configuración")
-    modo = st.radio("Método de selección:", ["🤖 Automático (Kaiser)", "✋ Manual"])
+    modo = st.radio("Método de selección:", ["Automático (Kaiser)", "Manual"])
     
-    if modo == "🤖 Automático (Kaiser)":
+    if modo == "Automático (Kaiser)":
         n_factores = max(sum(eigenvalues > 1), 1)
         st.info(f"El modelo sugiere **{n_factores} factores** basándose en la regla de Kaiser.")
     else:
@@ -117,7 +121,7 @@ with col_conf:
             value=default_val
         )
 
-    ejecutar = st.button("🚀 Ejecutar Análisis", type="primary", use_container_width=True)
+    ejecutar = st.button("Ejecutar análisis", type="primary", width='stretch')
 
 st.divider()
 
@@ -132,22 +136,22 @@ if ejecutar:
         cargas = pd.DataFrame(fa.loadings_, index=df.columns)
         cargas.columns = [f"Factor {i+1}" for i in range(n_factores)]
         
-        st.header("3. Interpretación de Factores")
+        st.header("Interpretación de factores")
         
         tab1, tab2 = st.tabs(["Mapa de Calor (Cargas)", "Diagrama de Barras"])
         
         with tab1:
             fig_heat = heatmap_cargas(cargas)
-            st.plotly_chart(fig_heat, use_container_width=True)
+            st.plotly_chart(fig_heat, width='stretch')
             
         with tab2:
             fig_bar = generar_diagrama_plotly(cargas)
-            st.plotly_chart(fig_bar, use_container_width=True)
+            st.plotly_chart(fig_bar, width='stretch')
             
         # ==========================================
         # 5. EXPORTACIÓN BLINDADA
         # ==========================================
-        st.subheader("Datos Transformados")
+        st.subheader("Datos transformados")
         
         # 🛑 PARCHE 3: Le agregamos index=df.index para que no se pierda la alineación
         factores_df = pd.DataFrame(fa.transform(df), columns=cargas.columns, index=df.index)
@@ -157,10 +161,10 @@ if ejecutar:
             # Quitamos el .values para que Pandas respete los índices originales al pegar
             df_export[col] = factores_df[col]
             
-        st.dataframe(df_export.head(50), use_container_width=True)
+        st.dataframe(df_export.head(50), width='stretch')
         
         st.download_button(
-            label="⬇️ Descargar Datos con Factores Integrados",
+            label="Descargar datos con factores integrados",
             data=df_export.to_csv(index=False).encode('utf-8'),
             file_name="dataset_factorial.csv",
             mime="text/csv"

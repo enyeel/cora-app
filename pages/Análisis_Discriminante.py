@@ -2,10 +2,14 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from modules.discriminant import ejecutar_analisis_discriminante
+from modules.layout import renderizar_df_paginado, render_sidebar
 
-st.set_page_config(page_title="Análisis Discriminante", page_icon="🎯", layout="wide")
+st.set_page_config(page_title="Análisis Discriminante", page_icon=None, layout="wide")
 
-st.title("🎯 Análisis Discriminante")
+# Sidebar compartido
+render_sidebar()
+
+st.title("Análisis Discriminante")
 
 # Verificar si hay datos limpios
 if 'df_chido' not in st.session_state or st.session_state.df_chido is None:
@@ -20,8 +24,8 @@ df = st.session_state.df_chido
 def ejecutar_analisis_cache(dataframe, objetivo, predictoras):
     return ejecutar_analisis_discriminante(dataframe, objetivo, predictoras)
 
-# --- PASO 1: SELECCIONAR VARIABLE OBJETIVO ---
-st.subheader("📌 Paso 1: Selecciona la variable a predecir (objetivo)")
+# --- Seleccionar variable objetivo ---
+st.subheader("Selecciona la variable a predecir (objetivo)")
 
 def obtener_variables_objetivo_validas(dataframe):
     validas = []
@@ -60,8 +64,8 @@ if columna_objetivo:
 
 st.markdown("---")
 
-# --- PASO 2: SELECCIONA LAS VARIABLES PREDICTORAS ---
-st.subheader("📊 Paso 2: Selecciona las variables predictoras")
+# --- Selección de variables predictoras ---
+st.subheader("Selecciona las variables predictoras")
 
 #  FILTRO INTELIGENTE USANDO LOS METADATOS 
 metadata = st.session_state.get('metadata', {})
@@ -103,10 +107,10 @@ else:
     if len(variables_predictoras) < 2:
         st.warning("⚠️ Se recomienda seleccionar al menos 2 variables predictoras para un análisis discriminante óptimo.")
 
-# --- PASO 3: EJECUTAR ANÁLISIS Y GESTIONAR SESSION STATE ---
-st.subheader("🚀 Paso 3: Ejecutar Análisis")
+# --- Ejecutar análisis y gestionar session state ---
+st.subheader("Ejecutar análisis")
 
-with st.expander("📋 Resumen de configuración"):
+with st.expander("Resumen de configuración"):
     st.write(f"**Variable objetivo:** `{columna_objetivo}`")
     st.write(f"**Variables predictoras:** {len(variables_predictoras)}")
     st.write(f"**Grupos a clasificar:** {df[columna_objetivo].nunique()}")
@@ -136,7 +140,7 @@ if "disc_resultados" not in st.session_state:
     st.session_state.disc_resultados = None
 
 # EL BOTÓN SOLO CALCULA Y GUARDA EN SESSION STATE
-if st.button("🔍 Ejecutar Análisis Discriminante", type="primary", key="disc_ejecutar"):
+if st.button("Ejecutar análisis discriminante", type="primary", key="disc_ejecutar"):
     with st.spinner("Procesando análisis discriminante (puede tardar un momento)..."):
         # Llamamos a la función
         resultados = ejecutar_analisis_cache(
@@ -156,10 +160,10 @@ if st.session_state.disc_resultados is not None:
     if "error" in resultados:
         st.error(resultados["error"])
     else:
-        st.success("✅ Análisis completado con éxito")
+        st.success("Análisis completado con éxito")
         st.markdown("---")
         
-        st.subheader("📊 Resultados del Análisis")
+        st.subheader("Resultados del análisis")
         
         col1, col2, col3, col4 = st.columns(4)
         with col1:
@@ -174,26 +178,26 @@ if st.session_state.disc_resultados is not None:
         # Convertimos la lista de tuplas en un diccionario para acceder fácil
         figuras_dict = dict(resultados["figuras"])
         
-        with st.expander("📈 Funciones Discriminantes"):
+        with st.expander("Funciones discriminantes"):
             st.dataframe(resultados["funciones_discriminantes"], width='stretch')
             if "Funciones Discriminantes" in figuras_dict:
                 st.plotly_chart(figuras_dict["Funciones Discriminantes"], width='stretch')
         
         if "Variables Discriminantes" in figuras_dict:
-            with st.expander("📦 Variables Más Discriminantes"):
+            with st.expander("Variables más discriminantes"):
                 st.plotly_chart(figuras_dict["Variables Discriminantes"], width='stretch')
 
-        with st.expander("🎯 Centroides de Grupos"):
+        with st.expander("Centroides de grupos"):
             st.dataframe(resultados["centroides"], width='stretch')
             if "Perfil de Centroides" in figuras_dict:
                 st.plotly_chart(figuras_dict["Perfil de Centroides"], width='stretch')
         
-        with st.expander("📊 Matriz de Confusión"):
+        with st.expander("Matriz de confusión"):
             st.dataframe(resultados["matriz_confusion"], width='stretch')
             if "Matriz de Confusión" in figuras_dict:
                 st.plotly_chart(figuras_dict["Matriz de Confusión"], width='stretch')
         
-        with st.expander("🔬 Test de Box M (Homogeneidad de Covarianzas)"):
+        with st.expander("Test de Box M (homogeneidad de covarianzas)"):
             box_m = resultados["test_box_m"]
             col1, col2 = st.columns(2)
             with col1:
@@ -204,16 +208,17 @@ if st.session_state.disc_resultados is not None:
                 st.write(f"**Valor p:** {box_m['p_valor']:.6f}" if not pd.isna(box_m['p_valor']) else "**Valor p:** No disponible")
             st.write(f"**Interpretación:** {box_m['interpretacion']}")
         
-        with st.expander("📊 Clasificación por Grupo"):
+        with st.expander("Clasificación por grupo"):
             df_clasificacion = pd.DataFrame(resultados["clasificacion_por_grupo"]).T
             st.dataframe(df_clasificacion, width='stretch')
             if "Precisión por Grupo" in figuras_dict:
                 st.plotly_chart(figuras_dict["Precisión por Grupo"], width='stretch')
         
         if len(resultados["casos_mal_clasificados"]) > 0:
-            with st.expander("⚠️ Casos Mal Clasificados"):
-                st.dataframe(resultados["casos_mal_clasificados"], width='stretch')
+            with st.expander("Casos mal clasificados"):
+                renderizar_df_paginado(resultados["casos_mal_clasificados"], page_size=10)
+                # st.dataframe(resultados["casos_mal_clasificados"], width='stretch')
         else:
-            st.success("✅ ¡Todos los casos fueron clasificados correctamente!")
+            st.success("¡Todos los casos fueron clasificados correctamente!")
         
         st.markdown("---")

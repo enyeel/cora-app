@@ -1,26 +1,29 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from modules.renderers import renderizar_df_paginado
+from modules.layout import renderizar_df_paginado, render_sidebar
 from modules.clustering import (
     preparar_datos, generar_grafica_codo, aplicar_kmeans, 
     aplicar_jerarquico, generar_grafica_clusters, generar_dendrograma
 )
 
-st.set_page_config(page_title="Clustering | DIA", page_icon="🧩", layout="wide")
+st.set_page_config(page_title="Clustering | DIA", page_icon=None, layout="wide")
 
-st.title("🧩 Análisis de Segmentación (Clustering)")
-st.markdown("Agrupa tus datos automáticamente descubriendo patrones ocultos mediante IA no supervisada.")
+# Sidebar compartido
+render_sidebar()
+
+st.title("Análisis de segmentación (clustering)")
+st.markdown("Agrupa tus datos automáticamente descubriendo patrones ocultos mediante métodos no supervisados.")
 
 # 1. VERIFICAR SI HAY DATOS (Usamos df_encoded por lo que platicamos)
 if 'df_encoded' not in st.session_state:
-    st.warning("⚠️ ¡Papi, espérate! No hay datos en memoria. Ve a la página principal, sube tu dataset y confírmalo.")
+    st.warning("No hay datos en memoria. Vaya a la página principal, cargue su dataset y confirme para continuar.")
     st.stop()
 
 df = st.session_state['df_encoded']
 
 # 2. SECCIÓN A: CONFIGURACIÓN 
-st.header("1. Configuración del Modelo ⚙️")
+st.header("Configuración del modelo")
 col1, col2 = st.columns(2)
 
 with col1:
@@ -57,8 +60,8 @@ with col2:
     algoritmo = st.radio("Selecciona el Algoritmo:", ["K-Means (Rápido, Distancias)", "Jerárquico (Árbol, Agrupación)"])
 
 # 4. SECCIÓN B: DIAGNÓSTICO DEL K IDEAL
-st.header("2. Diagnóstico del Número Óptimo de Clusters 📊")
-st.markdown("Observa la gráfica sugerida para decidir cuántos grupos (`K`) formar.")
+st.header("Diagnóstico del número óptimo de clusters")
+st.markdown("Observe la gráfica sugerida para decidir cuántos grupos (K) formar.")
 
 
 if "K-Means" in algoritmo:
@@ -72,7 +75,7 @@ else:
 st.divider()
 
 # 5. SECCIÓN C: EJECUCIÓN (CON PERSISTENCIA EN MEMORIA)
-st.header("3. Ejecución del Modelo 🚀")
+st.header("Ejecución del modelo")
 
 col_k, col_btn = st.columns([3, 1])
 with col_k:
@@ -80,7 +83,7 @@ with col_k:
 
 with col_btn:
     st.write("") # Espaciador para alinear el botón
-    if st.button("🤖 ¡Ejecutar Agrupación!", type="primary", width='stretch'):
+    if st.button("Ejecutar agrupación", type="primary", width='stretch'):
         
         with st.spinner("Calculando distancias espaciales..."):
             # Ejecutar el algoritmo correspondiente
@@ -113,7 +116,7 @@ if st.session_state.get("cluster_huella") != huella_cluster:
 # 6. SECCIÓN D: RESULTADOS (Solo se muestra si hay algo guardado en memoria)
 if 'cluster_resultados' in st.session_state:
     st.divider()
-    st.header("4. Resultados de la Agrupación ✨")
+    st.header("Resultados de la agrupación")
     
     resultados = st.session_state['cluster_resultados']
     
@@ -125,7 +128,7 @@ if 'cluster_resultados' in st.session_state:
     st.plotly_chart(resultados['figura'], width='stretch')
     
     # Tabla final y exportación
-    with st.expander("Ver y Exportar Datos Agrupados"):
+    with st.expander("Ver y exportar datos agrupados"):
         # 1. Traemos a "El Chido" (Textos originales)
         df_humano = st.session_state['df_chido'].copy()
         
@@ -143,7 +146,7 @@ if 'cluster_resultados' in st.session_state:
         # 4. Exportamos el humano, no el encodeado
         csv_cluster = df_humano.to_csv(index=False).encode('utf-8')
         st.download_button(
-            label="⬇️ Descargar Datos con Etiquetas de Cluster",
+            label="Descargar datos con etiquetas de cluster",
             data=csv_cluster,
             file_name="dataset_clusterizado_limpio.csv",
             mime="text/csv"
