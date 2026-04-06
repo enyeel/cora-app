@@ -35,16 +35,16 @@ def inicializar_sesion(df_raw, nombre_archivo):
 # =======================================================
 # 🖥️ INTERFAZ DE USUARIO (UI)
 # =======================================================
-st.set_page_config(page_title="CEXO | by DIA", page_icon="☀️", layout="wide")
+st.set_page_config(page_title="CORA | by DIA", page_icon="☀️", layout="wide")
 
 with st.sidebar:
-    st.markdown("## CEXO by ☀️ DIA")
+    st.markdown("## CORA by ☀️ DIA")
     st.caption("**Data Intelligence & Analytics**")
     st.caption("📍 *Software desarrollado en el Bajío Valley*")
     st.divider()
     st.caption("© 2026 DIA. Todos los derechos reservados a los 11 fundadores (CDIA).")
 
-st.title("CEXO Analysis")
+st.title("CORA Analysis")
 st.markdown("*Powered by **DIA** - Algoritmos de vanguardia para datos impecables.*")
 st.divider()
 
@@ -126,7 +126,7 @@ if 'df_original' in st.session_state:
     # ==========================================
     if anomalias["vacias"] or anomalias["zombies"] or anomalias["coercion"]:
         st.header("Limpieza Estructural Automática")
-        st.info("💡 **CEXO AI** encontró anomalías estructurales antes de empezar el análisis.")
+        st.info("💡 **CORA AI** encontró anomalías estructurales antes de empezar el análisis.")
 
         pipeline_config["estructural"]["drop_cols"] = []
         pipeline_config["estructural"]["coerce_cols"] = []
