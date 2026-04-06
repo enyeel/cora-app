@@ -35,7 +35,7 @@ def inicializar_sesion(df_raw, nombre_archivo):
 # =======================================================
 # 🖥️ INTERFAZ DE USUARIO (UI)
 # =======================================================
-st.set_page_config(page_title="CORA | by DIA", page_icon=None, layout="wide")
+st.set_page_config(page_title="CORA | by DIA", page_icon="📊", layout="wide")
 
 # Sidebar compartido
 render_sidebar()
