@@ -144,7 +144,6 @@ if 'desc_resultados' in st.session_state:
         st.dataframe(res['freq_tbl'], width='stretch', hide_index=True)
         
     # 6.2 GRÁFICAS DE DISTRIBUCIÓN
-# 6.2 GRÁFICAS DE DISTRIBUCIÓN
 with tab5:
     st.subheader("Distribución de los datos")
     
