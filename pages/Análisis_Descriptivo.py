@@ -169,7 +169,6 @@ if 'desc_resultados' in st.session_state:
         cc1, cc2 = st.columns([1, 2])
         cc1.dataframe(res['cat_tbl'], width='stretch', hide_index=True)
         cc2.plotly_chart(res['fig_cat_bar'], width='stretch')
-    with tab5:
 
 elif col_num is None:
     st.info("Seleccione una columna numérica y haga clic en 'Ejecutar análisis' para comenzar.")
