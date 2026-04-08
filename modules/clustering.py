@@ -53,14 +53,14 @@ def aplicar_kmeans(df_limpio, datos_escalados, n_clusters):
     etiquetas = modelo.fit_predict(datos_escalados)
 
     df_res = df_limpio.copy()
-    df_res['Cluster'] = etiquetas.astype(str)
+    df_res['Cluster'] = (etiquetas + 1).astype(str)
 
     score = silhouette_score(datos_escalados, etiquetas, sample_size=10000, random_state=42)
     return df_res, modelo, score
 
 # --- ALGORITMO: JERÁRQUICO ---
-def aplicar_jerarquico(df_limpio, datos_escalados, n_clusters, max_filas=10000):
-    """Ejecuta Clustering Jerárquico con control de RAM."""
+def aplicar_jerarquico(df_limpio, datos_escalados, n_clusters, metodo_enlace='ward', max_filas=10000):
+    """Ejecuta Clustering Jerárquico con control de RAM y selección de método."""
     if len(datos_escalados) > max_filas:
         indices = np.random.choice(len(datos_escalados), max_filas, replace=False)
         datos_proc = datos_escalados[indices]
@@ -69,14 +69,19 @@ def aplicar_jerarquico(df_limpio, datos_escalados, n_clusters, max_filas=10000):
         datos_proc = datos_escalados
         df_res = df_limpio.copy()
 
-    modelo = AgglomerativeClustering(n_clusters=n_clusters)
+    # Agregamos el parámetro 'linkage' para cumplir con la maestra
+    modelo = AgglomerativeClustering(n_clusters=n_clusters, linkage=metodo_enlace)
     etiquetas = modelo.fit_predict(datos_proc)
 
-    df_res['Cluster'] = etiquetas.astype(str)
+    # Ajuste: Sumamos +1 para que el conteo empiece en 1 y no en 0
+    df_res['Cluster'] = (etiquetas + 1).astype(str)
+
+    # Mantenemos tu configuración de score que no daba problemas
     score = silhouette_score(datos_proc, etiquetas, sample_size=2500, random_state=42)
+
     return df_res, score
 
-# --- GRÁFICA: DISPERSIÓN (PARCHEADA) ---
+# --- GRÁFICA: DISPERSIÓN ---
 def generar_grafica_clusters(df_resultado, x_col, y_col, modelo_kmeans=None, scaler=None):
     """Genera el Scatter Plot interactivo con centroides si aplica."""
     fig = px.scatter(
@@ -96,21 +101,45 @@ def generar_grafica_clusters(df_resultado, x_col, y_col, modelo_kmeans=None, sca
     return fig
 
 # ---  GRÁFICA: DENDROGRAMA ---
-def generar_dendrograma(datos_escalados, muestra_max=100):
-    """Genera el árbol jerárquico para análisis visual de distancias."""
+def generar_dendrograma(datos_escalados, metodo_enlace='ward', muestra_max=100):
+    """Genera el árbol jerárquico para análisis visual de distancias con método dinámico."""
     if len(datos_escalados) > muestra_max:
         indices = np.random.choice(len(datos_escalados), muestra_max, replace=False)
         datos_ready = datos_escalados[indices]
     else:
         datos_ready = datos_escalados
 
-    Z = linkage(datos_ready, method='ward')
-    fig = ff.create_dendrogram(datos_ready, colorscale=px.colors.qualitative.Prism)
+    # Cambiamos 'ward' por el parámetro metodo_enlace
+    Z = linkage(datos_ready, method=metodo_enlace)
+
+    # IMPORTANTE: Pasamos 'Z' (la matriz de enlace) al create_dendrogram
+    # para que la gráfica use el método de cálculo correcto.
+    fig = ff.create_dendrogram(
+        datos_ready,
+        colorscale=px.colors.qualitative.Prism,
+        linkagefun=lambda x: linkage(x, method=metodo_enlace)
+    )
 
     fig.update_layout(
-        template='plotly_dark', 
-        title="Dendrograma de Agrupación Jerárquica",
-        height=600  
+        template='plotly_dark',
+        title=f"Dendrograma de Agrupación (Método: {metodo_enlace.capitalize()})",
+        height=600
+    )
+    return fig
+
+# --- GRÁFICA: PERFILES / MEDIAS  ---
+def generar_grafica_perfiles(df_resultado, columnas):
+    """Genera el gráfico de coordenadas paralelas para ver las medias por cluster."""
+    # Convertimos Cluster a numérico temporalmente para la escala de color
+    df_resultado['Cluster_Num'] = df_resultado['Cluster'].astype(int)
+
+    fig = px.parallel_coordinates(
+        df_resultado,
+        dimensions=columnas,
+        color="Cluster_Num",
+        title="Análisis de Perfiles: Comparativa de Medias por Segmento",
+        template='plotly_dark',
+        color_continuous_scale=px.colors.qualitative.Prism
     )
     return fig
 
