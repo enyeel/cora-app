@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 from factor_analyzer import FactorAnalyzer
 from factor_analyzer.factor_analyzer import calculate_kmo, calculate_bartlett_sphericity
+from modules.factorial import ordenar_matriz_cargas
 
 # Importamos las funciones limpias de tu compa
 from modules.factorial import (
@@ -21,63 +22,65 @@ st.set_page_config(page_title="Análisis Factorial", page_icon=None, layout="wid
 # Sidebar compartido
 render_sidebar()
 
-st.title("Análisis factorial exploratorio (AFE)")
+st.title("Análisis Factorial Exploratorio (AFE)")
 st.markdown("Descubra las variables latentes (factores) que explican el comportamiento de sus datos.")
 
 # ==========================================
 # 1. PREPARACIÓN DE DATOS CON MANEJO DE ESTADO
 # ==========================================
-if 'df_encoded' not in st.session_state or st.session_state['df_encoded'] is None:
+if 'df_chido' not in st.session_state or st.session_state['df_chido'] is None:
     st.warning("No hay datos confirmados en memoria. Vaya a la página principal, cargue y confirme su dataset para continuar.")
-    st.stop() # 👈 Esto detiene la ejecución aquí mismo, evitando el crash.
+    st.stop()
 
-df_base = st.session_state.get('df_encoded', None) 
+df_chido = st.session_state['df_chido']
+metadata = st.session_state.get('metadata', {})
+
+# 🔥 FILTRO ESTRICTO: Solo columnas que la metadata marque como "numerico"
+columnas_validas = []
+for col in df_chido.columns:
+    info_columna = metadata.get(col, {})
+    tipo = info_columna.get('tipo', '')
+    
+    # Si la palabra 'numerico' está en el tipo (ej. numerico_continuo, numerico_discreto)
+    if 'numerico' in tipo:
+        columnas_validas.append(col)
+
+# Si no hay numéricas, detenemos la app
+if len(columnas_validas) < 2:
+    st.error("🚨 No hay suficientes variables numéricas en este dataset para hacer un Análisis Factorial. (Se requieren al menos 2).")
+    st.stop()
+
+# Creamos df_base solo con las columnas permitidas
+df_base = df_chido[columnas_validas].copy()
+
+# 🛡️ ESCUDO ANTI-TEXTO: Forzamos la conversión a número. 
+# Si hay algún texto raro colado, lo vuelve NaN para que la función limpiar_datos lo rellene después.
+df_base = df_base.apply(pd.to_numeric, errors='coerce')
 
 sello_oficial = st.session_state.get('sello_datos_confirmados', 'sin_sello')
 huella_fact = f"{sello_oficial}"
-
-# Solo recalculamos la preparación si la huella cambió
-if st.session_state.get('fact_huella_prep') != huella_fact:
-    with st.spinner("Preparando y limpiando datos numéricos..."):
-        try:
-            df_raw = df_base.copy()
-            df_limpio = limpiar_datos(df_raw)
-            df_sin_multi = eliminar_multicolinealidad(df_limpio)
-            
-            borradas = set(df_limpio.columns) - set(df_sin_multi.columns)
-            st.session_state['fact_cols_borradas'] = borradas
-            
-            df_listo = normalizar(df_sin_multi)
-            
-            st.session_state['df_fact_ready'] = df_listo
-            st.session_state['fact_huella_prep'] = huella_fact # Guardamos la huella actual
-            
-            if 'fact_error' in st.session_state:
-                del st.session_state['fact_error']
-                
-        except ValueError as e:
-            st.session_state['fact_error'] = str(e)
-
-# Si hubo un error en la limpieza, mostramos alerta y detenemos la app
-if 'fact_error' in st.session_state:
-    st.error(f"🚨 No se pudo procesar el Análisis Factorial: {st.session_state['fact_error']}")
-    st.info("💡 Consejo: Sube un archivo que contenga al menos 2 columnas con valores numéricos.")
-    st.stop()
-
-df = st.session_state['df_fact_ready']
-
-# 🛑 PARCHE 2: Mostramos visualmente si alguna columna fue asesinada por multicolinealidad
-if st.session_state.get('fact_cols_borradas'):
-    st.warning(f"⚠️ Se ignoraron estas variables por tener correlación casi perfecta (>0.95) con otras: **{', '.join(st.session_state['fact_cols_borradas'])}**")
-
 # ==========================================
 # 2. PRUEBAS DE VIABILIDAD (KMO y Bartlett)
 # ==========================================
 st.header("Diagnóstico de viabilidad")
 
-kmo_all, kmo_model = calculate_kmo(df)
-chi2, p_value = calculate_bartlett_sphericity(df)
+kmo_all, kmo_model = calculate_kmo(df_base)
+chi2, p_value = calculate_bartlett_sphericity(df_base)
 
+# 🔥 SÚPER PARCHE ANTI-NaN: Detener si la matemática explota
+if pd.isna(kmo_model) or pd.isna(p_value):
+    st.error("🚨 ¡Análisis Imposible! Las matemáticas del modelo fallaron (Resultado: NaN).")
+    st.info("""
+    **¿Por qué pasa esto?**
+    1. Tienes más variables (columnas) que sujetos (filas).
+    2. Hay multicolinealidad perfecta (una variable es combinación lineal de otras).
+    3. Las variables seleccionadas no tienen **ninguna correlación** entre ellas.
+    
+    *Solución: Revisa tus datos, elimina variables redundantes o consigue una muestra más grande.*
+    """)
+    st.stop() # Corta la ejecución para que no salgan gráficas rotas
+
+# Mostrar métricas
 col1, col2 = st.columns(2)
 with col1:
     st.metric(label="Índice KMO", value=f"{kmo_model:.3f}", 
@@ -86,8 +89,12 @@ with col2:
     st.metric(label="Prueba de Bartlett (p-value)", value=f"{p_value:.5f}", 
               help="Debe ser menor a 0.05 para que el análisis sea válido.")
 
-if kmo_model < 0.6:
-    st.warning("⚠️ El KMO es bajo. Tus datos podrían no ser los mejores para un Análisis Factorial, pero puedes continuar bajo tu propio riesgo.")
+# 🛑 ALERTA DE KMO BASURA
+if kmo_model < 0.5:
+    st.error("🛑 ¡KMO Inaceptable! El valor es menor a 0.50. Esto significa que las variables comparten muy poca varianza y los resultados del Análisis Factorial carecerán de sentido.")
+    st.stop() # Si el KMO es menor a 0.5, ni siquiera deberíamos dejarlo continuar
+elif kmo_model < 0.6:
+    st.warning("⚠️ El KMO es bajo (mediocre). Tus datos no son los mejores para un Análisis Factorial, pero puedes continuar bajo tu propio riesgo.")
 else:
     st.success("✅ Los datos son viables para el análisis.")
 
@@ -101,7 +108,7 @@ st.header("Selección de factores")
 col_plot, col_conf = st.columns([2, 1])
 
 with col_plot:
-    fig_scree, eigenvalues = generar_scree_plot(df)
+    fig_scree, eigenvalues = generar_scree_plot(df_base)
     st.plotly_chart(fig_scree, width='stretch')
 
 with col_conf:
@@ -112,7 +119,7 @@ with col_conf:
         n_factores = max(sum(eigenvalues > 1), 1)
         st.info(f"El modelo sugiere **{n_factores} factores** basándose en la regla de Kaiser.")
     else:
-        max_val = max(1, len(df.columns) // 2)
+        max_val = max(1, len(df_base.columns) // 2)
         default_val = min(2, max_val)
         n_factores = st.number_input(
             "Número de Factores:", 
@@ -130,15 +137,19 @@ st.divider()
 # ==========================================
 if ejecutar:
     with st.spinner("Calculando cargas factoriales..."):
+        st.title("Análisis Factorial Confirmatorio (AFC)")
+        #st.markdown("Descubra las variables latentes (factores) que explican el comportamiento de sus datos.")
+
+
         fa = FactorAnalyzer(n_factors=n_factores, rotation='varimax', method='minres')
-        fa.fit(df)
+        fa.fit(df_base)
         
-        cargas = pd.DataFrame(fa.loadings_, index=df.columns)
+        cargas = pd.DataFrame(fa.loadings_, index=df_base.columns)
         cargas.columns = [f"Factor {i+1}" for i in range(n_factores)]
         
         st.header("Interpretación de factores")
         
-        tab1, tab2 = st.tabs(["Mapa de Calor (Cargas)", "Diagrama de Barras"])
+        tab1, tab2 = st.tabs(["Mapa de Calor (Cargas)", "Diagrama de Senderos"])
         
         with tab1:
             fig_heat = heatmap_cargas(cargas)
@@ -146,26 +157,31 @@ if ejecutar:
             
         with tab2:
             fig_bar = generar_diagrama_plotly(cargas)
-            st.plotly_chart(fig_bar, width='stretch')
+            st.plotly_chart(fig_bar, width='content')
             
         # ==========================================
-        # 5. EXPORTACIÓN BLINDADA
+        # 5. EXPORTACIÓN AL ESTILO SPSS (LO QUE PIDIÓ LA MAESTRA)
         # ==========================================
-        st.subheader("Datos transformados")
+        st.subheader("Matriz de Cargas Factoriales (Para exportar)")
+        st.markdown("Tabla con los factores en columnas y variables en filas. Usa el control para ocultar los valores bajos.")
+
+        # Slider para que la maestra juegue con el umbral (default 0.4)
+        umbral = 0.4
+        # umbral = st.slider("Ocultar cargas absolutas menores a:", min_value=0.0, max_value=0.9, value=0.4, step=0.05)
+
+        # Aplicar el filtro: Si pasa el umbral lo hacemos texto con 4 decimales, si no, lo dejamos en blanco
+        cargas_filtradas = cargas.copy()
+        for col in cargas_filtradas.columns:
+            cargas_filtradas[col] = cargas_filtradas[col].apply(lambda x: f"{x:.4f}" if abs(x) >= umbral else "")
+
+        # Mostramos la tabla limpia en la UI
+        st.dataframe(cargas_filtradas, width='stretch')
         
-        # 🛑 PARCHE 3: Le agregamos index=df.index para que no se pierda la alineación
-        factores_df = pd.DataFrame(fa.transform(df), columns=cargas.columns, index=df.index)
-        
-        df_export = st.session_state['df_original'].copy()
-        for col in factores_df.columns:
-            # Quitamos el .values para que Pandas respete los índices originales al pegar
-            df_export[col] = factores_df[col]
-            
-        st.dataframe(df_export.head(50), width='stretch')
-        
+        # Botón de descarga
         st.download_button(
-            label="Descargar datos con factores integrados",
-            data=df_export.to_csv(index=False).encode('utf-8'),
-            file_name="dataset_factorial.csv",
+            label="Descargar Matriz de Cargas (.csv)",
+            # MUY IMPORTANTE: index=True para que las variables salgan en la primera columna
+            data=cargas_filtradas.to_csv(index=True).encode('utf-8'), 
+            file_name="matriz_cargas_factorial.csv",
             mime="text/csv"
         )
