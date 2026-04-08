@@ -27,25 +27,34 @@ def ejecutar_analisis_cache(dataframe, objetivo, predictoras):
 # --- Seleccionar variable objetivo ---
 st.subheader("Selecciona la variable a predecir (objetivo)")
 
-def obtener_variables_objetivo_validas(dataframe):
-    validas = []
-    for col in dataframe.columns:
-        nunique = dataframe[col].nunique()
-        if 1 < nunique <= 20:
-            if dataframe[col].value_counts().min() >= 2:
-                validas.append(col)
-    return validas
 
-columnas_categoricas = obtener_variables_objetivo_validas(df)
+#  FILTRO INTELIGENTE USANDO LOS METADATOS 
+metadata = st.session_state.get('metadata', {})
 
-if len(columnas_categoricas) == 0:
+# Filtramos usando el perfilador: solo numericos y que NO sean la variable objetivo
+columnas_numericas_validas = [
+    col for col in df.columns
+    if col in metadata 
+    and metadata[col]["tipo"] in ["numerico_continuo", "numerico_discreto", "categorico_bajo", "categorico_alto", "id"]
+    and col != columna_objetivo
+]
+
+# Fallback de seguridad (por si el metadata no está cargado por alguna razón)
+if not columnas_numericas_validas:
+    columnas_numericas_validas = [
+        col for col in df.select_dtypes(include=['number']).columns 
+        if col != columna_objetivo and not col.lower().startswith("id")
+    ]
+
+
+if len(columnas_numericas_validas) == 0:
     st.warning("⚠️ No se encontraron variables válidas para usar como objetivo.")
     st.info("Requisitos: Entre 2 y 20 categorías, y al menos 2 datos por categoría.")
     st.stop()
 
 columna_objetivo = st.selectbox(
     "Variable dependiente (categórica):",
-    columnas_categoricas,
+    columnas_numericas_validas,
     key="disc_objetivo"
 )
 
@@ -67,23 +76,6 @@ st.markdown("---")
 # --- Selección de variables predictoras ---
 st.subheader("Selecciona las variables predictoras")
 
-#  FILTRO INTELIGENTE USANDO LOS METADATOS 
-metadata = st.session_state.get('metadata', {})
-
-# Filtramos usando el perfilador: solo numericos y que NO sean la variable objetivo
-columnas_numericas_validas = [
-    col for col in df.columns
-    if col in metadata 
-    and metadata[col]["tipo"] in ["numerico_continuo", "numerico_discreto"]
-    and col != columna_objetivo
-]
-
-# Fallback de seguridad (por si el metadata no está cargado por alguna razón)
-if not columnas_numericas_validas:
-    columnas_numericas_validas = [
-        col for col in df.select_dtypes(include=['number']).columns 
-        if col != columna_objetivo and not col.lower().startswith("id")
-    ]
 
 # UI para seleccionar el modo
 modo_seleccion = st.radio(
@@ -178,6 +170,38 @@ if st.session_state.disc_resultados is not None:
         # Convertimos la lista de tuplas en un diccionario para acceder fácil
         figuras_dict = dict(resultados["figuras"])
         
+        # --- NUEVO EXPANDER: HISTORIAL DE CAMBIOS ---
+        with st.expander("🔄 Historial de Cambios y Reagrupación"):
+            st.write("Esta tabla muestra cómo se movieron los datos desde sus grupos originales hacia la clasificación final del modelo.")
+            
+            historial = resultados["historial_grupos"]
+            st.dataframe(historial, use_container_width=True)
+            
+            st.markdown("---")
+            st.subheader("Análisis de movimientos:")
+            
+            # Lógica para explicar los cambios en lenguaje natural
+            for original in historial.index:
+                total_original = historial.loc[original].sum()
+                # Ver cuántos se quedaron en su lugar (si la columna existe)
+                quedaron = historial.loc[original, original] if original in historial.columns else 0
+                movidos = total_original - quedaron
+                
+                col1, col2 = st.columns([1, 2])
+                with col1:
+                    st.metric(f"Grupo {original}", f"{total_original} iniciales")
+                with col2:
+                    if movidos == 0:
+                        st.success(f"¡Perfecto! Los {total_original} se mantuvieron en su grupo.")
+                    else:
+                        st.warning(f"Se mantuvieron {quedaron} y se movieron {movidos} a otros grupos.")
+                        
+                        # Detalle de a dónde se fueron
+                        otros = historial.loc[original][historial.loc[original] > 0]
+                        for destino, cantidad in otros.items():
+                            if destino != original:
+                                st.write(f"• {cantidad} se pasaron al grupo **{destino}**")
+
         with st.expander("Funciones discriminantes"):
             st.dataframe(resultados["funciones_discriminantes"], width='stretch')
             if "Funciones Discriminantes" in figuras_dict:

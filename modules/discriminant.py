@@ -274,6 +274,22 @@ def ejecutar_analisis_discriminante(df, columna_objetivo, variables_predictoras)
                                                     name=str(grupo), line=dict(color=colores[i % len(colores)])))
             fig_radar.update_layout(title="Perfil de Centroides", height=500, width=700)
             figuras.append(("Perfil de Centroides", fig_radar))
+
+        # --- LÓGICA PARA EL HISTORIAL DE GRUPOS ---
+        # Comparamos la columna original del DataFrame de entrada contra las predicciones finales
+        historial_cambios = pd.crosstab(
+            df[columna_objetivo], 
+            df_clean['Prediccion'], 
+            rownames=['Grupo Original'], 
+            colnames=['Clasificado como']
+        )
+
+        # En el diccionario de retorno, agrega esta nueva clave:
+        return {
+            "resumen": { ... },
+            "historial_grupos": historial_cambios, # <-- AGREGA ESTA LÍNEA
+            # ... (el resto de tus retornos)
+        }
         
         # --- RETORNAR RESULTADOS ---
         return {
