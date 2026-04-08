@@ -1,3 +1,4 @@
+# pages/2_Descriptive.py
 import streamlit as st
 import pandas as pd
 
@@ -116,83 +117,58 @@ if 'desc_resultados' in st.session_state:
     
     st.header(f"Análisis de: `{col_num}`")
     
-    # Tabs principales
-    tab1, tab2, tab3, tab4, tab5 = st.tabs([
-        "Tendencia Central y Dispersión",
-        "Forma y Posición",
-        "Prueba de Normalidad",
-        "Tabla de Frecuencias",
-        "Gráficas"
-    ])
+    # 6.1 ESTADÍSTICAS BÁSICAS (TABS)
+    tab1, tab2, tab3, tab4 = st.tabs(["Tendencia Central y Dispersión", "Forma y Posición", "Prueba de Normalidad", "Tabla de Frecuencias"])
     
-    # =====================
-    # TAB 1
-    # =====================
     with tab1:
         c1, c2 = st.columns(2)
         c1.dataframe(res['ct'], width='stretch', hide_index=True)
         c2.dataframe(res['dm'], width='stretch', hide_index=True)
         
-    # =====================
-    # TAB 2
-    # =====================
     with tab2:
         c1, c2 = st.columns(2)
         c1.dataframe(res['sm'], width='stretch', hide_index=True)
         c1.dataframe(res['interp'], width='stretch', hide_index=True)
         c2.dataframe(res['pm'], width='stretch', hide_index=True)
         
-    # =====================
-    # TAB 3
-    # =====================
     with tab3:
         st.dataframe(res['nt'], width='stretch', hide_index=True)
         
-    # =====================
-    # TAB 4
-    # =====================
     with tab4:
         st.dataframe(res['freq_tbl'], width='stretch', hide_index=True)
         
-    # =====================
-    # TAB 5 (GRÁFICAS)
-    # =====================
-    with tab5:
-        st.subheader("Distribución de los datos")
-        
-        col_g1, col_g2 = st.columns(2)
-        col_g1.plotly_chart(res['fig_hist'], width='stretch')
-        col_g2.plotly_chart(res['fig_poly'], width='stretch')
-        
-        col_g3, col_g4 = st.columns(2)
-        col_g3.plotly_chart(res['fig_box'], width='stretch')
-        col_g4.plotly_chart(res['fig_ogive'], width='stretch')
-        
+    # 6.2 GRÁFICAS DE DISTRIBUCIÓN
+    st.subheader("Distribución de los datos")
+    col_g1, col_g2 = st.columns(2)
+    col_g1.plotly_chart(res['fig_hist'], width='stretch')
+    col_g2.plotly_chart(res['fig_poly'], width='stretch')
+    
+    col_g3, col_g4 = st.columns(2)
+    col_g3.plotly_chart(res['fig_box'], width='stretch')
+    col_g4.plotly_chart(res['fig_ogive'], width='stretch')
+    
+    # 6.3 ANÁLISIS MULTIVARIABLE Y CORRELACIÓN
+    st.divider()
+    st.header("Correlaciones globales (todas las variables numéricas)")
+    
+    if res['fig_corr'] is not None:
+        with st.expander("Ver matriz de correlación (heatmap)", expanded=True):
+            st.plotly_chart(res['fig_corr'], width='stretch')
+            
+        with st.expander("Ver matriz de dispersión (pairplot)"):
+            st.warning("Renderizar esta gráfica puede tomar unos segundos si hay muchas variables.")
+            if res.get('fig_matrix'):
+                st.plotly_chart(res['fig_matrix'], width='stretch')
+    else:
+        st.info("No hay suficientes variables numéricas para hacer correlaciones.")
+
+    # 6.4 ANÁLISIS CATEGÓRICO
+    if col_cat and 'cat_tbl' in res:
         st.divider()
-        st.header("Correlaciones globales")
-        
-        if res['fig_corr'] is not None:
-            with st.expander("Ver heatmap", expanded=True):
-                st.plotly_chart(res['fig_corr'], width='stretch')
-                
-            with st.expander("Ver matriz de dispersión"):
-                st.warning("Puede tardar si hay muchas variables.")
-                if res.get('fig_matrix'):
-                    st.plotly_chart(res['fig_matrix'], width='stretch')
-        else:
-            st.info("No hay suficientes variables numéricas.")
-        
-        if col_cat and 'cat_tbl' in res:
-            st.divider()
-            st.header(f"Análisis categórico: `{col_cat}`")
-            cc1, cc2 = st.columns([1, 2])
-            cc1.dataframe(res['cat_tbl'], width='stretch', hide_index=True)
-            cc2.plotly_chart(res['fig_cat_bar'], width='stretch')
+        st.header(f"Análisis categórico: `{col_cat}`")
+        cc1, cc2 = st.columns([1, 2])
+        cc1.dataframe(res['cat_tbl'], width='stretch', hide_index=True)
+        cc2.plotly_chart(res['fig_cat_bar'], width='stretch')
 
 elif col_num is None:
     st.info("Seleccione una columna numérica y haga clic en 'Ejecutar análisis' para comenzar.")
-
-
-
-    
-
