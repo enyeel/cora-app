@@ -86,7 +86,7 @@ with col1:
     st.metric(label="Índice KMO", value=f"{kmo_model:.3f}", 
               help="Mayor a 0.6 es aceptable. Mayor a 0.8 es excelente.")
 with col2:
-    st.metric(label="Prueba de Bartlett (p-value)", value=f"{p_value:.50f}", 
+    st.metric(label="Prueba de Bartlett (p-value)", value=f"{p_value:.5f}", 
               help="Debe ser menor a 0.05 para que el análisis sea válido.")
 
 # 🛑 ALERTA DE KMO BASURA
