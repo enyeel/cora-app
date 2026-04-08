@@ -49,10 +49,10 @@ for col in df.columns:
 # ==========================================
 col1, col2, col3 = st.columns(3)
 with col1:
-    # Cambiamos la etiqueta para indicar que ya no es forzosa
     col_num = st.selectbox("Selecciona una columna numérica (opcional):", options=[None] + columnas_numericas)
 with col2:
-    col_cat = st.selectbox("Selecciona una columna categórica (opcional):", options=[None] + columnas_categoricas)
+    # CAMBIO: Usamos multiselect y limitamos a 3 variables
+    cols_cat = st.multiselect("Selecciona columnas categóricas (hasta 3):", options=columnas_categoricas, max_selections=3)
 
 # Cálculo de bins sugeridos usando Sturges
 default_bins = 10
@@ -63,7 +63,6 @@ if col_num:
         default_bins = max(5, min(default_bins, 50))
 
 with col3:
-    # Mostramos explícitamente el texto de recomendación arriba del slider
     if col_num:
         st.markdown(f"💡 **Recomendado:** `{default_bins}` intervalos")
     else:
@@ -78,7 +77,9 @@ st.divider()
 # 4. GESTIÓN DEL CACHÉ Y HUELLAS (SIGNATURE)
 # ==========================================
 sello_oficial = st.session_state.get('sello_datos_confirmados', 'sin_sello')
-huella_actual = f"{sello_oficial}_{col_num}_{col_cat}_{bins}"
+# Unimos los nombres de las columnas categóricas para crear la huella única
+cat_signature = "_".join(cols_cat) if cols_cat else "none"
+huella_actual = f"{sello_oficial}_{col_num}_{cat_signature}_{bins}"
 
 if st.session_state.get('desc_huella') != huella_actual:
     if 'desc_resultados' in st.session_state:
@@ -88,16 +89,17 @@ if st.session_state.get('desc_huella') != huella_actual:
 # ==========================================
 # 5. EJECUCIÓN MATEMÁTICA Y GUARDADO
 # ==========================================
-# Ahora se ejecuta si hay al menos una columna seleccionada (num o cat)
-if ejecutar and (col_num is not None or col_cat is not None):
+# Ahora se ejecuta si hay col numérica o si la lista de categóricas no está vacía
+if ejecutar and (col_num is not None or len(cols_cat) > 0):
     with st.spinner("Masticando datos y generando gráficas..."):
         resultados = {}
         
         # Banderas para saber qué renderizar después
         resultados['has_num'] = col_num is not None
-        resultados['has_cat'] = col_cat is not None
+        resultados['has_cat'] = len(cols_cat) > 0
+        resultados['cols_cat_selected'] = cols_cat
         
-        # Análisis Numérico (Si se seleccionó)
+        # Análisis Numérico
         if col_num:
             freq_tbl = frequency_table(df, col_num, bins=bins)
             resultados['freq_tbl'] = freq_tbl
@@ -127,11 +129,17 @@ if ejecutar and (col_num is not None or col_cat is not None):
             resultados['fig_corr'] = correlation_heatmap(df, method=metodo_corr, include_categorical=True)
             resultados['fig_matrix'] = scatter_matrix(df)
             
-        # Análisis Categórico (Si se seleccionó)
-        if col_cat:
-            cat_tbl = categorical_frequency_table(df, col_cat)
-            resultados['cat_tbl'] = cat_tbl
-            resultados['fig_cat_bar'] = plot_categorical_bar(cat_tbl, col_cat)
+        # Análisis Categórico Multi-variable
+        if len(cols_cat) > 0:
+            resultados['cat_results'] = {}
+            for col_name in cols_cat:
+                cat_tbl = categorical_frequency_table(df, col_name)
+                fig_bar = plot_categorical_bar(cat_tbl, col_name)
+                # Almacenamos tabla y gráfica en un diccionario anidado por nombre de columna
+                resultados['cat_results'][col_name] = {
+                    'tabla': cat_tbl,
+                    'grafica': fig_bar
+                }
             
         st.session_state['desc_resultados'] = resultados
 
@@ -203,20 +211,18 @@ if 'desc_resultados' in st.session_state:
     
     # ---------------- Renderizado Categórico ----------------
     if res.get('has_cat'):
-        # Separador si hubo algo numérico arriba
         if res.get('has_num'):
             st.divider()
             
-        st.header(f"Análisis categórico de: `{col_cat}`")
-        cc1, cc2 = st.columns([1, 2])
-        cc1.dataframe(res['cat_tbl'], width='stretch', hide_index=True)
-        cc2.plotly_chart(res['fig_cat_bar'], width='stretch')
+        st.header(f"Análisis categórico")
+        
+        # Iteramos sobre las variables seleccionadas y creamos un expander por cada una
+        for col_name in res['cols_cat_selected']:
+            with st.expander(f"Variable: {col_name}", expanded=True):
+                cc1, cc2 = st.columns([1, 2])
+                cc1.dataframe(res['cat_results'][col_name]['tabla'], use_container_width=True, hide_index=True)
+                cc2.plotly_chart(res['cat_results'][col_name]['grafica'], use_container_width=True)
 
-# Mensaje de ayuda si no se ha seleccionado ninguna variable
-elif col_num is None and col_cat is None:
+# Mensaje de ayuda
+elif col_num is None and len(cols_cat) == 0:
     st.info("Seleccione al menos una columna (numérica o categórica) y haga clic en 'Ejecutar análisis' para comenzar.")
-
-
-
-    
-
