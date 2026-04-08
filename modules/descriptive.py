@@ -223,17 +223,34 @@ def shape_measures(data: pd.DataFrame, column: str) -> pd.DataFrame:
     kurt = kurtosis(data[column].dropna())
     return pd.DataFrame({"Measure": ["Skewness (Asimetría)", "Kurtosis (Curtosis)"], "Value": [skewness_val, kurt]})
 
-# ------------------------- correlation functions ----------------------
-def correlation_matrix(data: pd.DataFrame, method: str = 'pearson') -> pd.DataFrame:
-    numeric_data = data.select_dtypes(include=['number']).dropna()
+# ------------------------- correlation functions (MODIFICADAS) ----------------------
+def correlation_matrix(data: pd.DataFrame, method: str = 'pearson', include_categorical: bool = False) -> pd.DataFrame:
+    df_temp = data.copy()
+    
+    # CAMBIO: Mapeo de categóricas a números si el frontend lo solicita
+    if include_categorical:
+        for col in df_temp.select_dtypes(include=['object', 'category']).columns:
+            df_temp[col] = df_temp[col].astype('category').cat.codes
+            
+    numeric_data = df_temp.select_dtypes(include=['number']).dropna()
     if numeric_data.shape[1] < 2:
         return pd.DataFrame()
+        
+    # CAMBIO: Usamos el método que nos pase el frontend (pearson o spearman)
     return numeric_data.corr(method=method)
 
-def correlation_heatmap(data: pd.DataFrame, method: str = 'pearson'):
-    corr = correlation_matrix(data, method=method)
+def correlation_heatmap(data: pd.DataFrame, method: str = 'pearson', include_categorical: bool = False):
+    # CAMBIO: Pasamos las variables nuevas a la matriz
+    corr = correlation_matrix(data, method=method, include_categorical=include_categorical)
     if corr.empty:
         return None
-    fig = px.imshow(corr, text_auto=".2f", aspect="auto", color_continuous_scale='RdBu_r',
-                    title=f"Matriz de Correlación ({method.capitalize()})")
+        
+    fig = px.imshow(
+        corr, 
+        text_auto=".2f", 
+        aspect="auto", 
+        color_continuous_scale='RdBu_r',
+        zmin=-1, zmax=1, # Escala fija de correlación para que colores sean consistentes
+        title=f"Matriz de Correlación ({method.capitalize()})"
+    )
     return fig
