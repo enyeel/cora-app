@@ -1,4 +1,3 @@
-
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -17,7 +16,6 @@ if 'df_chido' not in st.session_state or st.session_state.df_chido is None:
     st.warning("⚠️ Primero carga y limpia los datos en la página principal.")
     st.stop()
 
-metadata = st.session_state.metadata
 df = st.session_state.df_chido
 
 #  WRAPPER PARA CACHEAR LA FUNCIÓN DIOS 
@@ -29,39 +27,46 @@ def ejecutar_analisis_cache(dataframe, objetivo, predictoras):
 # --- Seleccionar variable objetivo ---
 st.subheader("Selecciona la variable a predecir (objetivo)")
 
-# Como dijiste: le dejamos la puerta abierta a todas las columnas que el sistema haya detectado
-todas_las_columnas = list(df.columns)
 
-if len(todas_las_columnas) == 0:
-    st.warning("⚠️ No se encontraron variables en el dataset.")
+#  FILTRO INTELIGENTE USANDO LOS METADATOS 
+metadata = st.session_state.get('metadata', {})
+
+# Filtramos usando el perfilador: solo numericos y que NO sean la variable objetivo
+columnas_numericas_validas = [
+    col for col in df.columns
+    if col in metadata 
+    and metadata[col]["tipo"] in ["numerico_continuo", "numerico_discreto", "categorico_bajo", "categorico_alto", "id"]
+    and col != columna_objetivo
+]
+
+# Fallback de seguridad (por si el metadata no está cargado por alguna razón)
+if not columnas_numericas_validas:
+    columnas_numericas_validas = [
+        col for col in df.select_dtypes(include=['number']).columns 
+        if col != columna_objetivo and not col.lower().startswith("id")
+    ]
+
+
+if len(columnas_numericas_validas) == 0:
+    st.warning("⚠️ No se encontraron variables válidas para usar como objetivo.")
+    st.info("Requisitos: Entre 2 y 20 categorías, y al menos 2 datos por categoría.")
     st.stop()
 
-# 🔥 EL AVISO PARA EL USUARIO (Dejándole la responsabilidad)
-st.info("💡 **Recomendación:** Elige la variable que define los **grupos o categorías** a clasificar en tu dataset. El Análisis Discriminante intentará predecir esta variable basándose en las demás.")
-
 columna_objetivo = st.selectbox(
-    "Variable dependiente (categórica / agrupador):",
-    todas_las_columnas,
+    "Variable dependiente (categórica):",
+    columnas_numericas_validas,
     key="disc_objetivo"
 )
 
 if columna_objetivo:
     distribucion = df[columna_objetivo].value_counts()
-    
-    # Pequeña validación visual por si escogen algo que claramente no es grupo (ej. un ID con 500 grupos)
-    if len(distribucion) > 20:
-        st.warning(f"⚠️ Ojo: Esta variable tiene {len(distribucion)} grupos diferentes. El Análisis Discriminante suele volverse confuso o inestable con tantas categorías.")
-    elif len(distribucion) < 2:
-        st.error("🛑 Esta variable tiene menos de 2 grupos. Es imposible discriminar.")
-        st.stop()
-        
     st.write(f"**Grupos encontrados:** {len(distribucion)}")
     
     col1, col2 = st.columns(2)
     with col1:
         st.dataframe(distribucion.reset_index().rename(
             columns={'index': 'Grupo', columna_objetivo: 'Frecuencia'}
-        ), use_container_width=True)
+        ), width='stretch')
     with col2:
         st.write(f"**Variable:** `{columna_objetivo}`")
         st.write(f"**Tipo:** {df[columna_objetivo].dtype}")
@@ -71,26 +76,6 @@ st.markdown("---")
 # --- Selección de variables predictoras ---
 st.subheader("Selecciona las variables predictoras")
 
-# 🔥 EL CADENERO ESTRICTO: Solo números. Nada de categorías ni IDs.
-columnas_numericas_validas = [
-    col for col in df.columns
-    if col in metadata 
-    # Solo permitimos continuos y discretos. Afuera 'categorico_bajo', 'categorico_alto' y 'id'
-    and metadata[col]["tipo"] in ["numerico_continuo", "numerico_discreto"] 
-    and col != columna_objetivo
-]
-
-# Fallback de seguridad estricto (por si el metadata falla)
-if not columnas_numericas_validas:
-    columnas_numericas_validas = [
-        col for col in df.select_dtypes(include=['number']).columns 
-        if col != columna_objetivo and not col.lower().startswith("id")
-    ]
-
-# Si de plano no hay numéricas, detenemos el show
-if len(columnas_numericas_validas) < 1:
-    st.error("🚨 No se encontraron variables numéricas en tu dataset para usar como predictoras. Este análisis requiere variables continuas o discretas.")
-    st.stop()
 
 # UI para seleccionar el modo
 modo_seleccion = st.radio(
@@ -147,7 +132,7 @@ if "disc_resultados" not in st.session_state:
     st.session_state.disc_resultados = None
 
 # EL BOTÓN SOLO CALCULA Y GUARDA EN SESSION STATE
-if st.button("Ejecutar análisis discriminante", type="primary", key="disc_ejecutar", disabled=not columna_objetivo or len(variables_predictoras) < 2):
+if st.button("Ejecutar análisis discriminante", type="primary", key="disc_ejecutar"):
     with st.spinner("Procesando análisis discriminante (puede tardar un momento)..."):
         # Llamamos a la función
         resultados = ejecutar_analisis_cache(
@@ -184,7 +169,7 @@ if st.session_state.disc_resultados is not None:
         
         # Convertimos la lista de tuplas en un diccionario para acceder fácil
         figuras_dict = dict(resultados["figuras"])
-
+        
         # --- NUEVO EXPANDER: HISTORIAL DE CAMBIOS ---
         with st.expander("🔄 Historial de Cambios y Reagrupación"):
             st.write("Esta tabla muestra cómo se movieron los datos desde sus grupos originales hacia la clasificación final del modelo.")
@@ -216,7 +201,7 @@ if st.session_state.disc_resultados is not None:
                         for destino, cantidad in otros.items():
                             if destino != original:
                                 st.write(f"• {cantidad} se pasaron al grupo **{destino}**")
-        
+
         with st.expander("Funciones discriminantes"):
             st.dataframe(resultados["funciones_discriminantes"], width='stretch')
             if "Funciones Discriminantes" in figuras_dict:
