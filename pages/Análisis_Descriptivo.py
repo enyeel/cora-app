@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import numpy as np # <-- Agregado para el logaritmo de la regla de Sturges
 
 from modules.descriptive import (
     frequency_table, central_tendency, dispersion_measures, shape_measures,
@@ -52,8 +53,18 @@ with col1:
     col_num = st.selectbox("Selecciona una columna numérica:", options=[None] + columnas_numericas)
 with col2:
     col_cat = st.selectbox("Selecciona una columna categórica (opcional):", options=[None] + columnas_categoricas)
+
+# <-- CAMBIO: Cálculo predeterminado de Bins sugeridos usando Sturges
+default_bins = 10
+if col_num:
+    n_samples = len(df[col_num].dropna())
+    if n_samples > 0:
+        default_bins = int(1 + 3.322 * np.log10(n_samples))
+        default_bins = max(5, min(default_bins, 50)) # Lo mantenemos dentro del rango del slider
+
 with col3:
-    bins = st.slider("Número de intervalos (bins) para histograma:", min_value=5, max_value=50, value=10)
+    # <-- CAMBIO: El slider ahora toma 'default_bins' como valor inicial
+    bins = st.slider("Número de intervalos (bins) para histograma:", min_value=5, max_value=50, value=default_bins)
 
 ejecutar = st.button("Ejecutar análisis", type="primary", width='stretch')
 st.divider()
@@ -89,15 +100,23 @@ if ejecutar and col_num is not None:
         resultados['pm'] = position_measures(df, col_num)
         resultados['nt'] = normality_tests(df, col_num)
         
+        # <-- CAMBIO: Lógica adaptativa para seleccionar Pearson o Spearman basada en el dataframe original
+        es_normal_shapiro = resultados['nt']['Normal (Shapiro)'].values[0]
+        es_normal_ks = resultados['nt']['Normal (KS)'].values[0]
+        es_normal = es_normal_shapiro and es_normal_ks
+        
+        metodo_corr = 'pearson' if es_normal else 'spearman'
+        resultados['metodo_corr'] = metodo_corr # Lo guardamos para el frontend
+        
         # Gráficas numéricas
         resultados['fig_hist'] = histogram_from_table(freq_tbl, col_num)
         resultados['fig_poly'] = frequency_polygon(freq_tbl, col_num)
         resultados['fig_box'] = boxplot(df, col_num)
         resultados['fig_ogive'] = ogive(freq_tbl, col_num)
         
-        # Correlaciones generales
-        resultados['corr_df'] = correlation_matrix(df, method='pearson')
-        resultados['fig_corr'] = correlation_heatmap(df, method='pearson')
+        # <-- CAMBIO: Correlaciones con el método seleccionado y soporte a categóricos (asume backend actualizado)
+        resultados['corr_df'] = correlation_matrix(df, method=metodo_corr, include_categorical=True)
+        resultados['fig_corr'] = correlation_heatmap(df, method=metodo_corr, include_categorical=True)
         resultados['fig_matrix'] = scatter_matrix(df)
         
         # Categórico (Si existe)
@@ -169,7 +188,15 @@ if 'desc_resultados' in st.session_state:
         col_g4.plotly_chart(res['fig_ogive'], width='stretch')
         
         st.divider()
-        st.header("Correlaciones globales")
+        
+        # <-- CAMBIO: Título de correlaciones indicando qué prueba aplicó
+        st.header(f"Correlaciones globales ({res.get('metodo_corr', 'pearson').capitalize()})")
+        
+        # <-- CAMBIO: Alertita visual explicando por qué se eligió ese método
+        if res.get('metodo_corr') == 'spearman':
+            st.info("💡 Los datos no presentan distribución normal, por lo que se aplicó la correlación de **Spearman**.")
+        else:
+            st.success("✅ Los datos presentan distribución normal, usando la correlación lineal de **Pearson**.")
         
         if res['fig_corr'] is not None:
             with st.expander("Ver heatmap", expanded=True):
