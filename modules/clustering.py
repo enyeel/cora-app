@@ -144,19 +144,40 @@ def generar_dendrograma(datos_escalados, metodo_enlace='ward', muestra_max=100):
 # Cluster Profile Analysis via Parallel Coordinates
 # ====================================================================
 def generar_grafica_perfiles(df_resultado, columnas):
-    """Generates parallel coordinates plot to compare cluster mean profiles."""
-    # Convertimos Cluster a numérico temporalmente para la escala de color
-    df_resultado['Cluster_Num'] = df_resultado['Cluster'].astype(int)
+    """
+    Genera un gráfico de perfiles promediados con leyenda discreta.
+    Transforma los datos para que cada cluster sea una serie independiente.
+    """
+    # 1. Agrupamos por cluster y calculamos el promedio de las variables
+    df_medias = df_resultado.groupby('Cluster')[columnas].mean().reset_index()
+    
+    # 2. Transformamos el DataFrame para que Plotly pueda crear la leyenda discreta
+    df_melt = df_medias.melt(id_vars='Cluster', var_name='Variable', value_name='Promedio')
 
-    fig = px.parallel_coordinates(
-        df_resultado,
-        dimensions=columnas,
-        color="Cluster_Num",
-        title="Análisis de Perfiles: Comparativa de Medias por Segmento",
+    # 3. Ordenamos por Cluster (numéricamente) para que la leyenda sea 1, 2, 3...
+    df_melt['Cluster_Sort'] = df_melt['Cluster'].astype(int)
+    df_melt = df_melt.sort_values(['Cluster_Sort', 'Variable'])
+
+    # 4. Creamos la gráfica de líneas (Perfil de Medias)
+    fig = px.line(
+        df_melt, 
+        x='Variable', 
+        y='Promedio', 
+        color='Cluster', 
+        markers=True,    
+        title="Análisis de Perfiles: ADN de los Segmentos (Promedios por Cluster)",
         template='plotly_dark',
-        color_continuous_scale=px.colors.qualitative.Prism
+        color_discrete_sequence=px.colors.qualitative.Prism
     )
+
+    fig.update_layout(
+        legend_title_text='Segmento (Cluster)',
+        xaxis_title="Variables Analizadas",
+        yaxis_title="Valor Promedio (Escala Original)"
+    )
+    
     return fig
+
 
 
 # ========================================================================
