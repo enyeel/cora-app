@@ -36,7 +36,6 @@ columnas_numericas_validas = [
     col for col in df.columns
     if col in metadata 
     and metadata[col]["tipo"] in ["numerico_continuo", "numerico_discreto", "categorico_bajo", "categorico_alto", "id"]
-    and col != columna_objetivo
 ]
 
 # Fallback de seguridad (por si el metadata no está cargado por alguna razón)
