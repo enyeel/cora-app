@@ -1,6 +1,6 @@
 """descriptive.py
-Backend de análisis descriptivo 100% migrado a Plotly.
-Todas las funciones devuelven DataFrames de pandas o Figuras de Plotly.
+Descriptive analysis backend fully migrated to Plotly.
+All functions return pandas DataFrames or Plotly Figures.
 """
 
 import pandas as pd
@@ -15,7 +15,7 @@ def categorical_frequency_table(data: pd.DataFrame, column: str, top_n: int = 20
     col_data = data[column].dropna()
     freq = col_data.value_counts()
     
-    #  ESTRATEGIA TOP N: Agrupar la cola larga en "Otros" 
+    # Strategy: Group long tail into 'Other' category
     if len(freq) > top_n:
         top_freq = freq.iloc[:top_n]
         otros_freq = pd.Series([freq.iloc[top_n:].sum()], index=['Otros'])
@@ -25,7 +25,7 @@ def categorical_frequency_table(data: pd.DataFrame, column: str, top_n: int = 20
     cum_freq = freq.cumsum()
     
     table = pd.DataFrame({
-        "Category": freq.index.astype(str), # Convertir a string para evitar errores con listas
+        "Category": freq.index.astype(str),  # Convert to string to prevent list errors
         "Frequency": freq.values,
         "Relative Frequency": rel_freq.values,
         "Cumulative Frequency": cum_freq.values
@@ -34,7 +34,7 @@ def categorical_frequency_table(data: pd.DataFrame, column: str, top_n: int = 20
 
 def plot_categorical_bar(table: pd.DataFrame, column: str):
     fig = px.bar(table, x="Category", y="Frequency", text="Frequency",
-                 title=f"Gráfico de Barras - {column}", color="Category")
+                 title=f"Bar Chart - {column}", color="Category")
     fig.update_traces(textposition='outside')
     fig.update_layout(xaxis_tickangle=-45, showlegend=False)
     return fig
@@ -44,7 +44,7 @@ def central_tendency(data: pd.DataFrame, column: str) -> pd.DataFrame:
     col_data = data[column].dropna()
     mean = np.mean(col_data)
     median = np.median(col_data)
-    # Scipy mode update for newer versions
+    # Updated for newer scipy versions
     mode_result = stats.mode(col_data, keepdims=True)
     mode = mode_result.mode[0] if len(mode_result.mode) > 0 else np.nan
     
@@ -63,11 +63,13 @@ def dispersion_measures(data: pd.DataFrame, column: str) -> pd.DataFrame:
         "Value": [range_val, variance, std_dev, coef_var]
     })
 
-# ------------------------- frequency tables ----------------------------
+# ====================================================================
+# Frequency Distribution Tables
+# ====================================================================
 def frequency_table(data: pd.DataFrame, column: str, bins: int = None) -> pd.DataFrame:
     col_data = data[column].dropna()
     if col_data.empty:
-        raise ValueError(f"La columna '{column}' no tiene datos válidos.")
+        raise ValueError(f"Column '{column}' has no valid data.")
     
     if bins is None:
         n = len(col_data)
@@ -93,7 +95,7 @@ def frequency_table(data: pd.DataFrame, column: str, bins: int = None) -> pd.Dat
 # ------------------------------ plots ----------------------------------
 def histogram_from_table(table: pd.DataFrame, column: str):
     fig = px.bar(table, x="Interval", y="Frequency", text="Frequency",
-                 title=f"Histograma - {column}")
+                 title=f"Histogram - {column}")
     fig.update_traces(marker_color='royalblue', marker_line_color='black', marker_line_width=1, opacity=0.8)
     fig.update_layout(xaxis_tickangle=-45, bargap=0)
     return fig
@@ -105,8 +107,8 @@ def frequency_polygon(table: pd.DataFrame, column: str):
     return fig
 
 def boxplot(data: pd.DataFrame, column: str):
-    #  LÍMITE DE OUTLIERS VISUALES 
-    # Si hay demasiados datos, evitamos que Plotly dibuje cada outlier para no colapsar el DOM
+    # Limit visual outliers for large datasets to prevent DOM overflow
+    # If data is large, disable individual outlier display
     if len(data[column].dropna()) > 5000:
         fig = px.box(data, y=column, title=f"Boxplot - {column} (Outliers visuales ocultos)", points=False)
     else:

@@ -3,14 +3,14 @@ import numpy as np
 from sklearn.preprocessing import StandardScaler
 from pandas.api.types import is_numeric_dtype
 
-# ==========================================
-# 🩻 MÓDULO DE DETECCIÓN (RAYOS X)
-# ==========================================
+# ====================================================================
+# Data Anomaly Detection Module
+# ====================================================================
 
 def detectar_anomalias_estructurales(df):
     """
-    Escanea el DataFrame en busca de columnas 100% vacías, columnas zombie (>60% nulos)
-    y columnas que deberían ser numéricas pero tienen textos escondidos (coerción).
+    Scans the DataFrame for completely empty columns, sparse columns (>60% missing),
+    and mixed data types in numeric columns.
     """
     reporte = {
         "vacias": [],
@@ -27,7 +27,7 @@ def detectar_anomalias_estructurales(df):
         elif pct_nulos >= 0.60:
             reporte["zombies"].append(col)
 
-        # Detectar coerción
+        # Detect numeric columns with mixed data types
         if not is_numeric_dtype(df[col]):
             s_orig = df[col]
             s_num = pd.to_numeric(s_orig, errors='coerce')
@@ -41,10 +41,11 @@ def detectar_anomalias_estructurales(df):
     return reporte
 
 def detectar_outliers(df):
-    """Busca outliers numéricos. Devuelve un mapa de celdas atípicas y las columnas afectadas."""
+    """Identifies numeric outliers using the IQR method.
+    Returns a map of outlier cells and list of affected columns."""
     cols_num = df.select_dtypes(include=[np.number]).columns
     
-    # Creamos un mapa vacío (todo en Falso)
+    # Create an empty map (all False initially)
     mapa_outliers = pd.DataFrame(False, index=df.index, columns=df.columns)
     cols_afectadas = []
     
@@ -55,32 +56,32 @@ def detectar_outliers(df):
         Lim_inf = Q1 - 1.5 * IQR
         Lim_sup = Q3 + 1.5 * IQR
         
-        # Marcamos como True las celdas que se salen de los límites
+        # Mark cells outside the outlier boundaries
         mascara = (df[col] < Lim_inf) | (df[col] > Lim_sup)
         mapa_outliers[col] = mascara
         
-        if mascara.any(): # Si encontró al menos un outlier en esta columna
+        if mascara.any():
             cols_afectadas.append(col)
             
     return mapa_outliers, cols_afectadas
 
 def detectar_webones(df, umbral_varianza=0.0):
     """
-    Busca webones agrupando inteligentemente las columnas que comparten 
-    el mismo Mínimo y Máximo (Ej. escalas del 1 al 5).
+    Identifies records with zero variance by intelligently grouping columns
+    that share the same minimum and maximum values (e.g., Likert scales).
     """
-    # 1. Filtramos las numéricas y quitamos el ID
+    # Filter numeric columns excluding ID
     cols_num = [col for col in df.select_dtypes(include=[np.number]).columns if col != 'ID_Usuario']
     
     grupos_likert = {}
     
-    # 2. Agrupamos por Min y Max (ignorando los nulos)
+    # Group columns by Min and Max range
     for col in cols_num:
-        # Si la columna está totalmente vacía, la ignoramos
+        # Skip if column is completely empty
         if df[col].dropna().empty:
             continue
             
-        # Sacamos min y max ignorando los NaNs, y forzamos a entero para evitar el "1.0"
+        # Extract min/max ignoring NaN values
         minimo = int(df[col].min(skipna=True))
         maximo = int(df[col].max(skipna=True))
         
@@ -90,18 +91,18 @@ def detectar_webones(df, umbral_varianza=0.0):
             grupos_likert[etiqueta_rango] = []
         grupos_likert[etiqueta_rango].append(col)
 
-    # 3. Filtramos los grupos que tengan 3 o más preguntas
+    # Filter to keep only groups with 3+ items
     grupos_encuesta = {rango: columnas for rango, columnas in grupos_likert.items() if len(columnas) >= 3}
     
-    # Preparamos una lista de falsos (nadie es webón hasta que se demuestre lo contrario)
+    # Initialize series with all False values
     filas_webones = pd.Series(False, index=df.index)
     
-    # 4. Calculamos la varianza SOLO en los grupos detectados (Ej. Pregunta 1 a 5)
+    # Calculate variance only for detected grouped items (e.g., Likert scales)
     for rango, columnas in grupos_encuesta.items():
-        # Varianza horizontal (axis=1)
+        # Horizontal variance (axis=1)
         varianza = df[columnas].var(axis=1)
         
-        # Marcamos como True a los que tengan varianza nula
+        # Mark records with zero variance
         filas_webones = filas_webones | (varianza <= umbral_varianza)
         
     return filas_webones

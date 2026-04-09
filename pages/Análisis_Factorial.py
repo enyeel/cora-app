@@ -59,15 +59,15 @@ df_base = df_base.apply(pd.to_numeric, errors='coerce')
 
 sello_oficial = st.session_state.get('sello_datos_confirmados', 'sin_sello')
 huella_fact = f"{sello_oficial}"
-# ==========================================
-# 2. PRUEBAS DE VIABILIDAD (KMO y Bartlett)
-# ==========================================
-st.header("Diagnóstico de viabilidad")
+# ====================================================================
+# Viability Tests (KMO and Bartlett)
+# ====================================================================
+st.header("Viability Diagnostic")
 
 kmo_all, kmo_model = calculate_kmo(df_base)
 chi2, p_value = calculate_bartlett_sphericity(df_base)
 
-# 🔥 SÚPER PARCHE ANTI-NaN: Detener si la matemática explota
+# Critical safeguard: Stop if mathematical calculations fail
 if pd.isna(kmo_model) or pd.isna(p_value):
     st.error("🚨 ¡Análisis Imposible! Las matemáticas del modelo fallaron (Resultado: NaN).")
     st.info("""
@@ -80,19 +80,19 @@ if pd.isna(kmo_model) or pd.isna(p_value):
     """)
     st.stop() # Corta la ejecución para que no salgan gráficas rotas
 
-# Mostrar métricas
+# Display metrics
 col1, col2 = st.columns(2)
 with col1:
-    st.metric(label="Índice KMO", value=f"{kmo_model:.3f}", 
+    st.metric(label=" Índice KMO", value=f"{kmo_model:.3f}", 
               help="Mayor a 0.6 es aceptable. Mayor a 0.8 es excelente.")
 with col2:
     st.metric(label="Prueba de Bartlett (p-value)", value=f"{p_value:.5f}", 
               help="Debe ser menor a 0.05 para que el análisis sea válido.")
 
-# 🛑 ALERTA DE KMO BASURA
+# KMO quality assessment
 if kmo_model < 0.5:
     st.error("🛑 ¡KMO Inaceptable! El valor es menor a 0.50. Esto significa que las variables comparten muy poca varianza y los resultados del Análisis Factorial carecerán de sentido.")
-    st.stop() # Si el KMO es menor a 0.5, ni siquiera deberíamos dejarlo continuar
+    st.stop()
 elif kmo_model < 0.6:
     st.warning("⚠️ El KMO es bajo (mediocre). Tus datos no son los mejores para un Análisis Factorial, pero puedes continuar bajo tu propio riesgo.")
 else:
@@ -100,9 +100,9 @@ else:
 
 st.divider()
 
-# ==========================================
-# 3. SCREE PLOT Y CONFIGURACIÓN
-# ==========================================
+# ====================================================================
+# Factor Selection
+# ====================================================================
 st.header("Selección de factores")
 
 col_plot, col_conf = st.columns([2, 1])
@@ -112,34 +112,32 @@ with col_plot:
     st.plotly_chart(fig_scree, width='stretch')
 
 with col_conf:
-    st.markdown("### Configuración")
-    modo = st.radio("Método de selección:", ["Automático (Kaiser)", "Manual"])
+    st.markdown("### Configuration")
+    modo = st.radio("Selection method:", ["Automatic (Kaiser)", "Manual"])
     
-    if modo == "Automático (Kaiser)":
+    if modo == "Automatic (Kaiser)":
         n_factores = max(sum(eigenvalues > 1), 1)
-        st.info(f"El modelo sugiere **{n_factores} factores** basándose en la regla de Kaiser.")
+        st.info(f"Model suggests **{n_factores} factors** based on Kaiser rule.")
     else:
         max_val = max(1, len(df_base.columns) // 2)
         default_val = min(2, max_val)
         n_factores = st.number_input(
-            "Número de Factores:", 
+            "Number of Factors:", 
             min_value=1, 
             max_value=max_val, 
             value=default_val
         )
 
-    ejecutar = st.button("Ejecutar análisis", type="primary", width='stretch')
+    ejecutar = st.button("Execute analysis", type="primary", width='stretch')
 
 st.divider()
 
-# ==========================================
-# 4. RESULTADOS DEL MODELO
-# ==========================================
+# ====================================================================
+# Model Results
+# ====================================================================
 if ejecutar:
     with st.spinner("Calculando cargas factoriales..."):
         st.title("Análisis Factorial Confirmatorio (AFC)")
-        #st.markdown("Descubra las variables latentes (factores) que explican el comportamiento de sus datos.")
-
 
         fa = FactorAnalyzer(n_factors=n_factores, rotation='varimax', method='minres')
         fa.fit(df_base)
@@ -159,28 +157,25 @@ if ejecutar:
             fig_bar = generar_diagrama_plotly(cargas)
             st.plotly_chart(fig_bar, width='content')
             
-        # ==========================================
-        # 5. EXPORTACIÓN AL ESTILO SPSS (LO QUE PIDIÓ LA MAESTRA)
-        # ==========================================
+        # ====================================================================
+        # Export Factor Loading Matrix
+        # ====================================================================
         st.subheader("Matriz de Cargas Factoriales (Para exportar)")
         st.markdown("Tabla con los factores en columnas y variables en filas. Usa el control para ocultar los valores bajos.")
 
-        # Slider para que la maestra juegue con el umbral (default 0.4)
         umbral = 0.4
-        # umbral = st.slider("Ocultar cargas absolutas menores a:", min_value=0.0, max_value=0.9, value=0.4, step=0.05)
 
-        # Aplicar el filtro: Si pasa el umbral lo hacemos texto con 4 decimales, si no, lo dejamos en blanco
+        # Apply filter
         cargas_filtradas = cargas.copy()
         for col in cargas_filtradas.columns:
             cargas_filtradas[col] = cargas_filtradas[col].apply(lambda x: f"{x:.4f}" if abs(x) >= umbral else "")
 
-        # Mostramos la tabla limpia en la UI
+        # Display clean table
         st.dataframe(cargas_filtradas, width='stretch')
         
-        # Botón de descarga
+        # Download button
         st.download_button(
             label="Descargar Matriz de Cargas (.csv)",
-            # MUY IMPORTANTE: index=True para que las variables salgan en la primera columna
             data=cargas_filtradas.to_csv(index=True).encode('utf-8'), 
             file_name="matriz_cargas_factorial.csv",
             mime="text/csv"

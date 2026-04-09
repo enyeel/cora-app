@@ -19,20 +19,20 @@ render_sidebar()
 st.title("Análisis descriptivo y exploratorio")
 st.markdown("Comprenda la distribución, forma y correlación de sus variables.")
 
-# ==========================================
-# 1. EL CADENERO (VALIDACIÓN DE DATOS)
-# ==========================================
+# ====================================================================
+# Data Validation
+# ====================================================================
 if 'df_chido' not in st.session_state or st.session_state['df_chido'] is None:
     st.warning("⚠️ ¡Alto ahí! No hay datos en memoria. Ve a la página principal, sube tu dataset y dale al botón de 'Confirmar y Mandar a Análisis'.")
     st.stop()
 
-# Usamos df_chido porque queremos ver los nombres originales de las categorías, no los números encodeados
+# Use df_chido to preserve original category names
 df = st.session_state['df_chido']
 metadata = st.session_state.get('metadata', {})
 
-# ==========================================
-# 2. FILTRO INTELIGENTE DE COLUMNAS
-# ==========================================
+# ====================================================================
+# Column Filtering
+# ====================================================================
 columnas_numericas = []
 columnas_categoricas = []
 
@@ -44,9 +44,9 @@ for col in df.columns:
         else:
             columnas_categoricas.append(col)
 
-# ==========================================
-# 3. CONFIGURACIÓN UI
-# ==========================================
+# ====================================================================
+# User Interface Configuration
+# ====================================================================
 col1, col2, col3 = st.columns(3)
 with col1:
     col_num = st.selectbox("Selecciona una columna numérica (opcional):", options=[None] + columnas_numericas)
@@ -67,15 +67,15 @@ with col3:
         st.markdown(f"💡 **Recomendado:** `{default_bins}` intervalos")
     else:
         st.markdown("💡 **Recomendado:** (Selecciona una variable numérica)")
-        
+    
     bins = st.slider("Número de intervalos (bins) para histograma:", min_value=5, max_value=50, value=default_bins, label_visibility="collapsed")
 
 ejecutar = st.button("Ejecutar análisis", type="primary", width='stretch')
 st.divider()
 
-# ==========================================
-# 4. GESTIÓN DEL CACHÉ Y HUELLAS (SIGNATURE)
-# ==========================================
+# ====================================================================
+# Cache Management and Signature Tracking
+# ====================================================================
 sello_oficial = st.session_state.get('sello_datos_confirmados', 'sin_sello')
 # Unimos los nombres de las columnas categóricas para crear la huella única
 cat_signature = "_".join(cols_cat) if cols_cat else "none"
@@ -86,9 +86,9 @@ if st.session_state.get('desc_huella') != huella_actual:
         del st.session_state['desc_resultados']
     st.session_state['desc_huella'] = huella_actual
 
-# ==========================================
-# 5. EJECUCIÓN MATEMÁTICA Y GUARDADO
-# ==========================================
+# ====================================================================
+# Execution and Data Processing
+# ====================================================================
 # Ahora se ejecuta si hay col numérica o si la lista de categóricas no está vacía
 if ejecutar and (col_num is not None or len(cols_cat) > 0):
     with st.spinner("Masticando datos y generando gráficas..."):
@@ -143,9 +143,9 @@ if ejecutar and (col_num is not None or len(cols_cat) > 0):
             
         st.session_state['desc_resultados'] = resultados
 
-# ==========================================
-# 6. RENDERIZADO VISUAL DESDE MEMORIA
-# ==========================================
+# ====================================================================
+# Visual Rendering from Memory
+# ====================================================================
 if 'desc_resultados' in st.session_state:
     res = st.session_state['desc_resultados']
     

@@ -12,7 +12,7 @@ render_sidebar()
 
 st.title("Análisis Discriminante")
 
-# Verificar si hay datos limpios
+# Verify clean data is in memory
 if 'df_chido' not in st.session_state or st.session_state.df_chido is None:
     st.warning("⚠️ Primero carga y limpia los datos en la página principal.")
     st.stop()
@@ -20,23 +20,25 @@ if 'df_chido' not in st.session_state or st.session_state.df_chido is None:
 metadata = st.session_state.metadata
 df = st.session_state.df_chido
 
-#  WRAPPER PARA CACHEAR LA FUNCIÓN DIOS 
-# Esto guarda el resultado en memoria. Si metes los mismos datos, carga al instante.
+# Wrapper for caching analysis results
+# Stores results in memory for instant retrieval with same parameters
 @st.cache_data(show_spinner=False)
 def ejecutar_analisis_cache(dataframe, objetivo, predictoras):
     return ejecutar_analisis_discriminante(dataframe, objetivo, predictoras)
 
-# --- Seleccionar variable objetivo ---
+# ====================================================================
+# Target Variable Selection
+# ====================================================================
 st.subheader("Selecciona la variable a predecir (objetivo)")
 
-# Como dijiste: le dejamos la puerta abierta a todas las columnas que el sistema haya detectado
+# Allow selection from all available columns
 todas_las_columnas = list(df.columns)
 
 if len(todas_las_columnas) == 0:
     st.warning("⚠️ No se encontraron variables en el dataset.")
     st.stop()
 
-# 🔥 EL AVISO PARA EL USUARIO (Dejándole la responsabilidad)
+# User guidance for target variable selection
 st.info("💡 **Recomendación:** Elige la variable que define los **grupos o categorías** a clasificar en tu dataset. El Análisis Discriminante intentará predecir esta variable basándose en las demás.")
 
 columna_objetivo = st.selectbox(
@@ -48,7 +50,7 @@ columna_objetivo = st.selectbox(
 if columna_objetivo:
     distribucion = df[columna_objetivo].value_counts()
     
-    # Pequeña validación visual por si escogen algo que claramente no es grupo (ej. un ID con 500 grupos)
+    # Visual validation for group definition
     if len(distribucion) > 20:
         st.warning(f"⚠️ Ojo: Esta variable tiene {len(distribucion)} grupos diferentes. El Análisis Discriminante suele volverse confuso o inestable con tantas categorías.")
     elif len(distribucion) < 2:
@@ -68,54 +70,63 @@ if columna_objetivo:
 
 st.markdown("---")
 
-# --- Selección de variables predictoras ---
+# ====================================================================
+# Predictive Variables Selection
+# ====================================================================
 st.subheader("Selecciona las variables predictoras")
 
-# 🔥 EL CADENERO ESTRICTO: Solo números. Nada de categorías ni IDs.
+# ====================================================================
+# Strict Variable Filtering: Numeric Only
+# ====================================================================
 columnas_numericas_validas = [
     col for col in df.columns
     if col in metadata 
-    # Solo permitimos continuos y discretos. Afuera 'categorico_bajo', 'categorico_alto' y 'id'
+    # Only allow continuous and discrete numeric types
     and metadata[col]["tipo"] in ["numerico_continuo", "numerico_discreto"] 
     and col != columna_objetivo
 ]
 
-# Fallback de seguridad estricto (por si el metadata falla)
+# Strict safety fallback
 if not columnas_numericas_validas:
     columnas_numericas_validas = [
         col for col in df.select_dtypes(include=['number']).columns 
         if col != columna_objetivo and not col.lower().startswith("id")
     ]
 
-# Si de plano no hay numéricas, detenemos el show
+# Stop if no numeric variables
 if len(columnas_numericas_validas) < 1:
-    st.error("🚨 No se encontraron variables numéricas en tu dataset para usar como predictoras. Este análisis requiere variables continuas o discretas.")
+    st.error("No numeric variables found for use as predictors. This analysis requires continuous or discrete variables.")
     st.stop()
 
-# UI para seleccionar el modo
+# ====================================================================
+# Selection Mode
+# ====================================================================
+
+# UI for selection mode
 modo_seleccion = st.radio(
-    "Modo de selección:",
-    options=["Usar todas las variables numéricas válidas", "Seleccionar manualmente"],
+    "Selection mode:",
+    options=["Use all valid numeric variables", "Select manually"],
     horizontal=True
 )
 
-if modo_seleccion == "Usar todas las variables numéricas válidas":
+if modo_seleccion == "Use all valid numeric variables":
     variables_predictoras = columnas_numericas_validas
-    st.info(f"✅ Se usarán {len(variables_predictoras)} variables predictoras automáticamente (se excluyeron IDs y variables categóricas).")
-    st.write(f"**Variables incluidas:** {', '.join(variables_predictoras)}")
+    st.info(f"✅ {len(variables_predictoras)} predictive variables will be used automatically (IDs and categorical variables excluded).")
+    st.write(f"**Included variables:** {', '.join(variables_predictoras)}")
 else:
     variables_predictoras = st.multiselect(
-        "Selecciona las variables predictoras:",
+        "Select predictive variables:",
         options=columnas_numericas_validas,
         default=columnas_numericas_validas,
-        help="Elige las variables continuas o discretas que ayudarán a clasificar los grupos."
+        help="Choose continuous or discrete variables to help classify the groups."
     )
     
     if len(variables_predictoras) < 2:
-        st.warning("⚠️ Se recomienda seleccionar al menos 2 variables predictoras para un análisis discriminante óptimo.")
+        st.warning("Recommendation: Select at least 2 predictive variables for optimal discriminant analysis.")
 
-# --- Ejecutar análisis y gestionar session state ---
-st.subheader("Ejecutar análisis")
+# ====================================================================
+# Analysis Execution
+# ====================================================================
 
 with st.expander("Resumen de configuración"):
     st.write(f"**Variable objetivo:** `{columna_objetivo}`")
@@ -124,43 +135,47 @@ with st.expander("Resumen de configuración"):
     st.write(f"**Total de casos:** {len(df)}")
     st.write(f"**Casos sin nulos:** {len(df[variables_predictoras + [columna_objetivo]].dropna())}")
 
-# DETECTOR DE CAMBIOS (STATE SIGNATURE)
-# Ahora escuchamos al sello oficial de app.py, no a los switches en tiempo real
+# ====================================================================
+# Change Detection and State Management
+# ====================================================================
+# Listen to official seal from main page
 sello_oficial = st.session_state.get('sello_datos_confirmados', 'sin_sello')
 
-# Nuestra Súper Huella junta: El Sello de Confirmación + Variable Objetivo + Predictoras elegidas
+# Create signature from seal + target + predictors
 huella_actual = f"{sello_oficial}_{columna_objetivo}_{str(variables_predictoras)}"
 
 if "disc_huella_df" not in st.session_state:
     st.session_state.disc_huella_df = huella_actual
 
-# Si la huella actual no coincide con la guardada, algo cambió en el universo
+# Detect changes to reset results
 if st.session_state.disc_huella_df != huella_actual:
-    # Limpiamos los resultados obsoletos
     if "disc_resultados" in st.session_state:
         del st.session_state["disc_resultados"]
-    # Actualizamos la memoria con la nueva huella
     st.session_state.disc_huella_df = huella_actual
 
-# Inicializamos la variable de resultados si no existe
+# Initialize results variable
 if "disc_resultados" not in st.session_state:
     st.session_state.disc_resultados = None
 
-# EL BOTÓN SOLO CALCULA Y GUARDA EN SESSION STATE
+# ====================================================================
+# Execution Button and Results Processing
+# ====================================================================
 if st.button("Ejecutar análisis discriminante", type="primary", key="disc_ejecutar", disabled=not columna_objetivo or len(variables_predictoras) < 2):
     with st.spinner("Procesando análisis discriminante (puede tardar un momento)..."):
-        # Llamamos a la función
+        # Call analysis function
         resultados = ejecutar_analisis_cache(
             df, 
             columna_objetivo, 
             variables_predictoras
         )
-        # Guardamos en session_state para que sobreviva a cambios de página
+        # Store in session state for persistence
         st.session_state.disc_resultados = resultados
 
 
-#  LA RENDERIZACIÓN SE HACE SI HAY RESULTADOS GUARDADOS 
-# Ya no está anidado dentro del 'if st.button:', así que se dibuja aunque vengas de otra pestaña
+# ====================================================================
+# Results Rendering
+# ====================================================================
+# Render if results exist in memory
 if st.session_state.disc_resultados is not None:
     resultados = st.session_state.disc_resultados
     

@@ -8,13 +8,13 @@ from modules.cleaning_motor import aplicar_estructural, aplicar_outliers, aplica
 from modules.dataset_profiler import analizar_dataframe
 from modules.layout import renderizar_df_paginado, pintor_universal, render_sidebar
 
-# =======================================================
-# ⚙️ GESTIÓN DE ESTADO (SESSION STATE)
-# =======================================================
+# ====================================================================
+# Session State Management
+# ====================================================================
 def inicializar_sesion(df_raw, nombre_archivo):
-    """Configura la memoria por primera vez cuando se sube un archivo nuevo."""
+    """Initializes session state when a new file is uploaded."""
     if 'nombre_archivo' not in st.session_state or st.session_state['nombre_archivo'] != nombre_archivo:
-        st.session_state.clear() # Limpieza nuclear de sesiones viejas
+        st.session_state.clear()
         
         st.session_state['df_original'] = df_raw.copy()
         st.session_state['nombre_archivo'] = nombre_archivo
@@ -32,9 +32,9 @@ def inicializar_sesion(df_raw, nombre_archivo):
         st.session_state['metadata'] = analizar_dataframe(df_raw)
         st.session_state['anomalias'] = detectar_anomalias_estructurales(df_raw)
 
-# =======================================================
-# 🖥️ INTERFAZ DE USUARIO (UI)
-# =======================================================
+# ====================================================================
+# User Interface Configuration
+# ====================================================================
 st.set_page_config(page_title="CORA | by DIA", page_icon="📊", layout="wide")
 
 # Sidebar compartido

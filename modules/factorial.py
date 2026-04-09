@@ -48,17 +48,17 @@ def eliminar_multicolinealidad(df, umbral=0.95):
     return df.drop(columns=eliminar)
 
 
-# -------------------------------
-# 🔹 3. NORMALIZAR
-# -------------------------------
+# ====================================================================
+# 3. NORMALIZATION
+# ====================================================================
 def normalizar(df):
     scaler = StandardScaler()
     return pd.DataFrame(scaler.fit_transform(df), columns=df.columns)
 
 
-# -------------------------------
-# 🔹 4. SCREE PLOT (PLOTLY)
-# -------------------------------
+# ====================================================================
+# 4. SCREE PLOT (PLOTLY)
+# ====================================================================
 def generar_scree_plot(df):
     fa = FactorAnalyzer()
     fa.fit(df)
@@ -69,24 +69,24 @@ def generar_scree_plot(df):
         x=list(range(1, len(eigenvalues) + 1)),
         y=eigenvalues,
         markers=True,
-        title='Scree Plot (Valores Propios)',
-        labels={'x': 'Número de Factores', 'y': 'Eigenvalues'},
+        title='Scree Plot (Eigenvalues)',
+        labels={'x': 'Number of Factors', 'y': 'Eigenvalues'},
         template='plotly_dark'
     )
 
     return fig, eigenvalues
 
 
-# -------------------------------
-# 🔹 5. DIAGRAMA DE FACTORES
-# -------------------------------
+# ====================================================================
+# 5. FACTOR DIAGRAM
+# ====================================================================
 import plotly.graph_objects as go
 import numpy as np
 import pandas as pd
 
 def generar_diagrama_plotly(cargas, umbral=0.4):
-    # 1. AGRUPAR Y ORDENAR VARIABLES (Adiós telaraña)
-    # Buscamos cuál es el factor principal de cada variable (el número más alto)
+    # Group and sort variables to avoid tangled connections
+    # Find the dominant factor for each variable (highest loading)
     var_info = []
     for var in cargas.index:
         cargas_var = cargas.loc[var].abs()

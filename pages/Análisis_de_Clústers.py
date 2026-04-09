@@ -17,19 +17,19 @@ render_sidebar()
 st.title("Análisis de segmentación (clustering)")
 st.markdown("Agrupa tus datos automáticamente descubriendo patrones ocultos mediante métodos no supervisados.")
 
-# 1. VERIFICAR SI HAY DATOS 
+# Data Verification
 if 'df_encoded' not in st.session_state:
     st.warning("No hay datos en memoria. Vaya a la página principal, cargue su dataset y confirme para continuar.")
     st.stop()
 
 df = st.session_state['df_encoded']
 
-# 2. SECCIÓN A: CONFIGURACIÓN 
-st.header("Configuración del modelo")
+# Model Configuration
+st.header("Model Configuration")
 col1, col2 = st.columns(2)
 
 with col1:
-    # 🔥 FILTRO ESTRICTO DE METADATOS (Solo entran numéricos reales)
+    # Strict metadata filtering (only real numeric types)
     metadata = st.session_state.get('metadata', {}) 
     columnas_disponibles = [
         col for col in df.columns
@@ -38,7 +38,7 @@ with col1:
     ]
 
     if len(columnas_disponibles) < 2:
-        st.error("🚨 No se detectaron suficientes variables numéricas para hacer Clustering. Se requieren mínimo 2.")
+        st.error("Insufficient numeric variables detected for clustering. Minimum 2 required.")
         st.stop()
 
     cols_seleccionadas = st.multiselect(
@@ -56,8 +56,8 @@ with col1:
 with col2:
     algoritmo = st.radio("Selecciona el Algoritmo:", ["K-Means (Rápido, Distancias)", "Jerárquico (Árbol, Agrupación)"])
     
-    # 🔥 SELECTOR DE MÉTODO DE ENLACE EN ESPAÑOL -> INGLÉS (Solo si es jerárquico)
-    metodo_enlace_en = 'ward' # Valor por defecto
+    # Selector de método de enlace (solo para jerárquico)
+    metodo_enlace_en = 'ward'
     if "Jerárquico" in algoritmo:
         opciones_jerarquico = {
             "Ward (Minimiza varianza)": "ward",
@@ -71,7 +71,7 @@ with col2:
         )
         metodo_enlace_en = opciones_jerarquico[enlace_es]
 
-# 4. SECCIÓN B: DIAGNÓSTICO DEL K IDEAL
+# Model Configuration
 st.header("Diagnóstico del número óptimo de clusters")
 st.markdown("Observe la gráfica sugerida para decidir cuántos grupos (K) formar.")
 
@@ -80,18 +80,20 @@ if "K-Means" in algoritmo:
     st.plotly_chart(fig_codo, use_container_width=True)
 else:
     st.info("**Nota sobre el Dendrograma:** Para evitar que tu navegador colapse, esta gráfica muestra una muestra representativa de 100 registros. Las agrupaciones principales (colores) son precisas, aunque la forma exacta de las ramas varíe.")
-    # Le pasamos el método en inglés
+    # Pass linkage method in English
     fig_dendro = generar_dendrograma(datos_escalados, metodo_enlace=metodo_enlace_en)
     st.plotly_chart(fig_dendro, use_container_width=True)
 
 st.divider()
 
-# 5. SECCIÓN C: EJECUCIÓN (CON PERSISTENCIA EN MEMORIA)
-st.header("Ejecución del modelo")
+# ====================================================================
+# Model Execution
+# ====================================================================
+st.header("Model Execution")
 
 col_k, col_btn = st.columns([3, 1])
 with col_k:
-    # 🔥 LÍMITE LÓGICO DEL SLIDER SEGÚN LA CANTIDAD DE DATOS LIMPIOS
+    # Límite lógico del slider según la cantidad de datos limpios
     max_k_posible = min(15, len(df_clean) - 1)
     
     if max_k_posible < 2:
@@ -106,7 +108,7 @@ with col_k:
     )
 
 with col_btn:
-    st.write("") # Espaciador para alinear el botón
+    st.write("")
     if st.button("Ejecutar agrupación", type="primary", use_container_width=True):
         
         with st.spinner("Calculando distancias espaciales..."):
@@ -114,7 +116,7 @@ with col_btn:
                 df_res, modelo, score = aplicar_kmeans(df_clean, datos_escalados, k_elegido)
                 fig_res = generar_grafica_clusters(df_res, cols_procesadas[0], cols_procesadas[1], modelo, scaler)
             else:
-                # Le pasamos el método seleccionado
+                # Pass selected linkage method
                 df_res, score = aplicar_jerarquico(df_clean, datos_escalados, k_elegido, metodo_enlace=metodo_enlace_en)
                 fig_res = generar_grafica_clusters(df_res, cols_procesadas[0], cols_procesadas[1])
             
@@ -124,9 +126,9 @@ with col_btn:
                 'score': score
             }
 
-# DETECTOR DE CAMBIOS
+# Change detection
 sello_oficial = st.session_state.get('sello_datos_confirmados', 'sin_sello')
-# Metemos el linkage a la huella para que si cambian a "Complete", la app sepa y reseteé el resultado
+# Add linkage to signature for proper state reset on changes
 huella_cluster = f"{sello_oficial}_{algoritmo}_{metodo_enlace_en}_{str(cols_seleccionadas)}_{k_elegido}"
 
 if st.session_state.get("cluster_huella") != huella_cluster:
@@ -134,7 +136,9 @@ if st.session_state.get("cluster_huella") != huella_cluster:
         del st.session_state['cluster_resultados']
     st.session_state.cluster_huella = huella_cluster
 
-# 6. SECCIÓN D: RESULTADOS
+# ====================================================================
+# Results Visualization
+# ====================================================================
 if 'cluster_resultados' in st.session_state:
     st.divider()
     st.header("Resultados de la agrupación")
@@ -142,15 +146,15 @@ if 'cluster_resultados' in st.session_state:
     resultados = st.session_state['cluster_resultados']
     
     # Metricas
-    st.metric(label="Calidad de la Agrupación (Silhouette Score)", value=f"{resultados['score']:.3f}", 
-              help="Entre más cerca a 1.0, más definidos y separados están los grupos.")
+    st.metric(label="Clustering Quality (Silhouette Score)", value=f"{resultados['score']:.3f}", 
+              help="Values closer to 1.0 indicate better defined and separated groups.")
     
-    # Gráfica Dispersión
+    # Scatter plot
     st.plotly_chart(resultados['figura'], use_container_width=True)
     
-    # 🔥 AQUÍ MANDAMOS LLAMAR A TU NUEVA GRÁFICA DE PERFILES
-    st.markdown("### Perfiles por Clúster")
-    st.markdown("Revisa cómo se comportan en promedio las variables dentro de cada grupo para entender las características de cada clúster.")
+    # Cluster profile visualization
+    st.markdown("### Cluster Profiles")
+    st.markdown("Review average variable behavior within each group to understand cluster characteristics.")
     fig_perfiles = generar_grafica_perfiles(resultados['df_final'], cols_procesadas)
     st.plotly_chart(fig_perfiles, use_container_width=True)
     

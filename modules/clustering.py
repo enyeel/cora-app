@@ -8,28 +8,34 @@ from sklearn.cluster import KMeans, AgglomerativeClustering
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import silhouette_score
 
-# --- PREPARACIÓN ---
+# ====================================================================
+# Data Preparation Module
+# ====================================================================
 def preparar_datos(df, columnas=None):
     """
-    Paso: 'Configurar parámetros'.
-    Si no se pasan columnas, el sistema detecta automáticamente las numéricas.
+    Prepares data for clustering:
+    - Detects numeric columns if not specified
+    - Removes rows with missing values
+    - Applies standardization using Z-score
     """
-    # Si el usuario no eligió columnas, tomamos todas las que sean números
+    # If no columns specified, automatically detect numeric columns
     if columnas is None:
         columnas = df.select_dtypes(include=[np.number]).columns.tolist()
 
-    # Recibir datos del usuario  y limpiar solo las necesarias
+    # Clean data and remove missing values for selected columns only
     df_clean = df.dropna(subset=columnas).copy()
 
-    # Aplicar escalado estadístico
+    # Apply statistical scaling
     scaler = StandardScaler()
     datos_escalados = scaler.fit_transform(df_clean[columnas])
 
     return datos_escalados, df_clean, scaler, columnas
 
-# --- GRÁFICA DEL CODO ---
+# ====================================================================
+# Elbow Method Visualization
+# ====================================================================
 def generar_grafica_codo(datos_escalados, k_max=10):
-    """Calcula WCSS y retorna la gráfica para seleccionar K óptimo."""
+    """Computes WCSS for different K values and generates elbow curve."""
     wcss = []
     for i in range(1, k_max + 1):
         kmeans = KMeans(n_clusters=i, init='k-means++', random_state=42, n_init=10)
@@ -46,9 +52,11 @@ def generar_grafica_codo(datos_escalados, k_max=10):
     )
     return fig
 
-# --- ALGORITMO: K-MEANS ---
+# ====================================================================
+# K-Means Clustering Implementation
+# ====================================================================
 def aplicar_kmeans(df_limpio, datos_escalados, n_clusters):
-    """Ejecuta K-Means y asigna etiquetas a los datos."""
+    """Executes K-Means algorithm and assigns cluster labels."""
     modelo = KMeans(n_clusters=n_clusters, init='k-means++', random_state=42, n_init=10)
     etiquetas = modelo.fit_predict(datos_escalados)
 
@@ -58,9 +66,11 @@ def aplicar_kmeans(df_limpio, datos_escalados, n_clusters):
     score = silhouette_score(datos_escalados, etiquetas, sample_size=10000, random_state=42)
     return df_res, modelo, score
 
-# --- ALGORITMO: JERÁRQUICO ---
+# ====================================================================
+# Hierarchical Clustering Implementation
+# ====================================================================
 def aplicar_jerarquico(df_limpio, datos_escalados, n_clusters, metodo_enlace='ward', max_filas=10000):
-    """Ejecuta Clustering Jerárquico con control de RAM y selección de método."""
+    """Executes Hierarchical Clustering with linkage method selection and memory optimization."""
     if len(datos_escalados) > max_filas:
         indices = np.random.choice(len(datos_escalados), max_filas, replace=False)
         datos_proc = datos_escalados[indices]
@@ -69,21 +79,23 @@ def aplicar_jerarquico(df_limpio, datos_escalados, n_clusters, metodo_enlace='wa
         datos_proc = datos_escalados
         df_res = df_limpio.copy()
 
-    # Agregamos el parámetro 'linkage' para cumplir con la maestra
+    # Set linkage method and perform clustering
     modelo = AgglomerativeClustering(n_clusters=n_clusters, linkage=metodo_enlace)
     etiquetas = modelo.fit_predict(datos_proc)
 
-    # Ajuste: Sumamos +1 para que el conteo empiece en 1 y no en 0
+    # Adjust cluster labels to start from 1 instead of 0
     df_res['Cluster'] = (etiquetas + 1).astype(str)
 
-    # Mantenemos tu configuración de score que no daba problemas
+    # Maintain score calculation for consistency
     score = silhouette_score(datos_proc, etiquetas, sample_size=2500, random_state=42)
 
     return df_res, score
 
-# --- GRÁFICA: DISPERSIÓN ---
+# ====================================================================
+# Scatter Plot Visualization with Centroids
+# ====================================================================
 def generar_grafica_clusters(df_resultado, x_col, y_col, modelo_kmeans=None, scaler=None):
-    """Genera el Scatter Plot interactivo con centroides si aplica."""
+    """Generates interactive scatter plot with cluster centroids if applicable."""
     fig = px.scatter(
         df_resultado, x=x_col, y=y_col, color='Cluster',
         template='plotly_dark',
@@ -92,28 +104,29 @@ def generar_grafica_clusters(df_resultado, x_col, y_col, modelo_kmeans=None, sca
 
     if modelo_kmeans is not None and scaler is not None:
         centroides = scaler.inverse_transform(modelo_kmeans.cluster_centers_)
-        # NOTA: Los centroides se calculan para TODAS las columnas usadas.
-        # Aquí graficamos solo las posiciones 0 (X) y 1 (Y) correspondientes a las columnas elegidas.
+        # Centroids are calculated for all features used in clustering.
+        # Here we plot only the positions corresponding to selected X and Y columns.
         fig.add_trace(go.Scatter(
             x=centroides[:, 0], y=centroides[:, 1], mode='markers',
-            marker=dict(color='white', size=15, symbol='x'), name='Centroides'
+            marker=dict(color='white', size=15, symbol='x'), name='Centroids'
         ))
     return fig
 
-# ---  GRÁFICA: DENDROGRAMA ---
+# ====================================================================
+# Dendrogram Visualization
+# ====================================================================
 def generar_dendrograma(datos_escalados, metodo_enlace='ward', muestra_max=100):
-    """Genera el árbol jerárquico para análisis visual de distancias con método dinámico."""
+    """Generates hierarchical tree visualization with specified linkage method."""
     if len(datos_escalados) > muestra_max:
         indices = np.random.choice(len(datos_escalados), muestra_max, replace=False)
         datos_ready = datos_escalados[indices]
     else:
         datos_ready = datos_escalados
 
-    # Cambiamos 'ward' por el parámetro metodo_enlace
+    # Use linkage method and generate dendrogram
     Z = linkage(datos_ready, method=metodo_enlace)
 
-    # IMPORTANTE: Pasamos 'Z' (la matriz de enlace) al create_dendrogram
-    # para que la gráfica use el método de cálculo correcto.
+    # Pass linkage matrix to create_dendrogram for correct calculation
     fig = ff.create_dendrogram(
         datos_ready,
         colorscale=px.colors.qualitative.Prism,
@@ -127,9 +140,11 @@ def generar_dendrograma(datos_escalados, metodo_enlace='ward', muestra_max=100):
     )
     return fig
 
-# --- GRÁFICA: PERFILES / MEDIAS  ---
+# ====================================================================
+# Cluster Profile Analysis via Parallel Coordinates
+# ====================================================================
 def generar_grafica_perfiles(df_resultado, columnas):
-    """Genera el gráfico de coordenadas paralelas para ver las medias por cluster."""
+    """Generates parallel coordinates plot to compare cluster mean profiles."""
     # Convertimos Cluster a numérico temporalmente para la escala de color
     df_resultado['Cluster_Num'] = df_resultado['Cluster'].astype(int)
 
@@ -145,9 +160,9 @@ def generar_grafica_perfiles(df_resultado, columnas):
 
 
 # ========================================================================
-# SOFTWARE: CORA 
-# EQUIPO DE DESARROLLO: DIA
-# ------------------------------------------------------------------------
+# CORA - Clustering and Analysis Software
+# Development Team: DIA
+# ========================================================================
 # CRÉDITOS DE AUTORÍA (EXCLUSIVOS DE ESTE MÓDULO):
 # -- Angel Emilio Gutierrez Lozano (st4341@utr.edu.mx)
 # -- Abraham Fernando Garcia Buendia (st4316@utr.edu.mx)
