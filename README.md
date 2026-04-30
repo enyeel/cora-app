@@ -60,7 +60,7 @@ Si deseas clonar este repositorio y ejecutar CORA en tu entorno local, sigue est
 
 1.  Clona este repositorio:
     ```
-    git clone [https://github.com/enyeel/cora-app.git](https://www.google.com/search?q=https://github.com/enyeel/cora-app.git)
+    git clone https://github.com/enyeel/cora-app.git
     cd cora-app
     ```
 
