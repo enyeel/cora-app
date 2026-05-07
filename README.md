@@ -25,22 +25,22 @@ El sistema está construido bajo una arquitectura modular, separando la interfaz
 
 ### 2\. Estadística Descriptiva
 
-  * **Autor(es):** [Carlos] ([@GithubCarlos](https://www.google.com/search?q=link)) y [Fani] ([@GithubFani](https://www.google.com/search?q=link))
+  * **Autor(es):** [Carlos] ([@Carlos4573](https://github.com/Carlos4573)) y [Fani] ([@Smol-coffe](https://github.com/Smol-coffe))
   * **Descripción:** Análisis exploratorio de datos (EDA) automatizado. Genera medidas de tendencia central, dispersión, asimetría y tablas de frecuencia dinámicas. Incluye visualizaciones interactivas para entender la distribución inicial de los datos.
 
 ### 3\. Análisis Factorial Exploratorio (AFE)
 
-  * **Autor(es):** [Karina] ([@GithubKarina](https://www.google.com/search?q=link)) y [Emiliano] ([@GithubEmiliano](https://www.google.com/search?q=link))
+  * **Autor(es):** [Karina] ([@anakherchav](https://github.com/anakherchav)) y [Emiliano] ([@Emiliano23-max](https://github.com/Emiliano23-max))
   * **Descripción:** Módulo de reducción de dimensionalidad. Ejecuta pruebas de viabilidad (KMO y Bartlett), elimina multicolinealidad dinámicamente y calcula cargas factoriales utilizando rotación Varimax. Incluye la visualización del *Scree Plot* y mapas de calor interactivos.
 
 ### 4\. Análisis Discriminante Lineal (LDA)
 
-  * **Autor(es):** [Lora/Yara] ([@GithubYara](https://www.google.com/search?q=link)) y [Sebastian] ([@GithubSebas](https://www.google.com/search?q=link))
+  * **Autor(es):** [Yara] ([@Yara09-L](https://github.com/Yara09-L)) y [Sebastian] ([@Elsebas27](https://github.com/Elsebas27))
   * **Descripción:** Algoritmo supervisado para clasificación y evaluación de variables predictoras. Genera funciones discriminantes, calcula centroides por grupo, matrices de confusión y ejecuta el test de Box M para evaluar la homogeneidad de las covarianzas.
 
 ### 5\. Análisis de Conglomerados (Clustering)
 
-  * **Autor(es):** Fernando ([@GithubFer](https://www.google.com/search?q=link)) y Emilio ([@GithubEmilio](https://www.google.com/search?q=link))
+  * **Autor(es):** Abraham ([@Abanche](https://github.com/Abanche)) y Emilio ([@AngelGTZ28](https://github.com/AngelGTZ28))
   * **Descripción:** Segmentación mediante IA no supervisada. Soporta modelos no jerárquicos (K-Means) apoyados por el Método del Codo, y algoritmos jerárquicos ilustrados mediante Dendrogramas interactivos. Evalúa la calidad de la agrupación a través del *Silhouette Score*.
 
 -----
